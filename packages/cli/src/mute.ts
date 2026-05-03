@@ -1,8 +1,22 @@
-export function runMute(_d: string): Promise<void> {
-  console.log('mute: not yet implemented');
-  return Promise.resolve();
+import kleur from 'kleur';
+import { ConfigStore, configFilePath } from '@agent-notifier/core';
+import { parseDuration } from './lib/duration.js';
+
+export async function runMute(input: string): Promise<void> {
+  await Promise.resolve();
+  const until = parseDuration(input);
+  const store = new ConfigStore(configFilePath(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+  store.update((c) => {
+    c.mute = { until: until.toISOString() };
+  });
+  console.log(`${kleur.yellow('🔇')} muted until ${until.toISOString()}`);
 }
-export function runUnmute(): Promise<void> {
-  console.log('unmute: not yet implemented');
-  return Promise.resolve();
+
+export async function runUnmute(): Promise<void> {
+  await Promise.resolve();
+  const store = new ConfigStore(configFilePath(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+  store.update((c) => {
+    c.mute = null;
+  });
+  console.log(`${kleur.green('🔔')} unmuted`);
 }
