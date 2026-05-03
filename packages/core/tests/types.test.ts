@@ -1,4 +1,3 @@
-// packages/core/tests/types.test.ts
 import { describe, it, expect } from 'vitest';
 import { EventSchema, ConfigSchema, KindSchema, ToolNameSchema } from '../src/types.js';
 
@@ -29,26 +28,30 @@ describe('types', () => {
     });
     expect(e.kind).toBe('PERMISSION');
   });
+});
 
-  it('ConfigSchema fills defaults for an empty document', () => {
-    const c = ConfigSchema.parse({ version: 1, tz: 'UTC' });
-    expect(c.global.enabled).toBe(true);
-    expect(c.mute).toBeNull();
-    expect(c.schedules).toEqual([]);
-    expect(c.projectDefault.enabled).toBe(true);
+describe('ConfigSchema v2', () => {
+  it('parses an empty object with all defaults', () => {
+    const c = ConfigSchema.parse({ version: 2, tz: 'UTC' });
+    expect(c.version).toBe(2);
+    expect(c.idleGate.mode).toBe('fire-elsewhere');
+    expect(c.idleGate.thresholdSeconds).toBe(60);
+    expect(c.idleGate.unsupportedTerminalPolicy).toBe('fire');
+    expect(c.sound.darwin).toBe('Ping');
+    expect(c.sound.win32).toBe('ms-winsoundevent:Notification.Default');
+    expect(c.icon.darwin).toBeNull();
+    expect(c.icon.win32).toBeNull();
+    expect(c.logging.maxBytes).toBe(1_000_000);
+    expect(c.logging.generations).toBe(3);
   });
 
-  it('ConfigSchema accepts a fully populated document', () => {
-    const c = ConfigSchema.parse({
-      version: 1,
-      tz: 'Asia/Kolkata',
-      global: { enabled: true },
-      mute: { until: '2026-05-03T17:00:00.000Z' },
-      schedules: [{ id: 'work', type: 'allow', days: ['mon', 'tue'], from: '09:00', to: '18:00' }],
-      tools: { 'claude-code': { enabled: true } },
-      projectDefault: { enabled: true },
-      projects: { '/x': { enabled: false } },
-    });
-    expect(c.schedules[0]?.from).toBe('09:00');
+  it('rejects unknown fields under strict zod', () => {
+    expect(() =>
+      ConfigSchema.parse({ version: 2, tz: 'UTC', bogusField: true }),
+    ).toThrow();
+  });
+
+  it('rejects v1 directly (migration handles upgrade)', () => {
+    expect(() => ConfigSchema.parse({ version: 1, tz: 'UTC' })).toThrow();
   });
 });

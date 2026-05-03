@@ -34,19 +34,61 @@ export const ProjectEntrySchema = z.object({
 });
 export type ProjectEntry = z.infer<typeof ProjectEntrySchema>;
 
-export const ConfigSchema = z.object({
-  version: z.literal(1),
-  tz: z.string().min(1),
-  global: z.object({ enabled: z.boolean() }).default({ enabled: true }),
-  mute: z.object({ until: z.string().datetime() }).nullable().default(null),
-  schedules: z.array(ScheduleRuleSchema).default([]),
-  tools: z.record(ToolNameSchema, z.object({ enabled: z.boolean() })).default({
-    'claude-code': { enabled: true },
-    codex: { enabled: true },
-    gemini: { enabled: true },
-    opencode: { enabled: true },
-  }),
-  projectDefault: z.object({ enabled: z.boolean() }).default({ enabled: true }),
-  projects: z.record(z.string(), ProjectEntrySchema).default({}),
-});
+export const IdleGateModeSchema = z.enum([
+  'fire-elsewhere',
+  'always-fire',
+  'strict-terminal',
+  'strict-os-idle',
+]);
+export type IdleGateMode = z.infer<typeof IdleGateModeSchema>;
+
+export const UnsupportedTerminalPolicySchema = z.enum(['fire', 'gate']);
+export type UnsupportedTerminalPolicy = z.infer<typeof UnsupportedTerminalPolicySchema>;
+
+export const ConfigSchema = z
+  .object({
+    version: z.literal(2),
+    tz: z.string().min(1),
+    global: z.object({ enabled: z.boolean() }).default({ enabled: true }),
+    mute: z.object({ until: z.string().datetime() }).nullable().default(null),
+    schedules: z.array(ScheduleRuleSchema).default([]),
+    tools: z.record(ToolNameSchema, z.object({ enabled: z.boolean() })).default({
+      'claude-code': { enabled: true },
+      codex: { enabled: true },
+      gemini: { enabled: true },
+      opencode: { enabled: true },
+    }),
+    projectDefault: z.object({ enabled: z.boolean() }).default({ enabled: true }),
+    projects: z.record(z.string(), ProjectEntrySchema).default({}),
+
+    idleGate: z
+      .object({
+        mode: IdleGateModeSchema.default('fire-elsewhere'),
+        thresholdSeconds: z.number().int().min(0).max(3600).default(60),
+        unsupportedTerminalPolicy: UnsupportedTerminalPolicySchema.default('fire'),
+      })
+      .default({}),
+
+    sound: z
+      .object({
+        darwin: z.string().min(1).default('Ping'),
+        win32: z.string().min(1).default('ms-winsoundevent:Notification.Default'),
+      })
+      .default({}),
+
+    icon: z
+      .object({
+        darwin: z.string().min(1).nullable().default(null),
+        win32: z.string().min(1).nullable().default(null),
+      })
+      .default({}),
+
+    logging: z
+      .object({
+        maxBytes: z.number().int().min(1024).max(100_000_000).default(1_000_000),
+        generations: z.number().int().min(1).max(20).default(3),
+      })
+      .default({}),
+  })
+  .strict();
 export type Config = z.infer<typeof ConfigSchema>;
