@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -57,7 +57,13 @@ describe('hook → notify pipeline (stubbed notifier)', () => {
   });
 
   // Re-enabled in Task 5.1 once `disable --global` is implemented.
-  it.skip('respects global disable: writes log entry with reason but no stub notification', () => {
-    // …
+  it('respects global disable: writes log entry with reason but no stub notification', () => {
+    // pre-disable via the CLI itself
+    execFileSync('node', [BIN, 'disable', '--global'], { env: env(), stdio: 'ignore' });
+    const payload = JSON.stringify({ hook_event_name: 'Stop', session_id: 's', cwd: home });
+    spawnSync('node', [BIN, 'hook', '--tool', 'claude-code'], { input: payload, env: env() });
+    const log = readFileSync(join(home, '.agent-notifier', 'log', 'notifier.log'), 'utf8');
+    expect(log).toContain('global-disabled');
+    expect(existsSync(join(home, '.agent-notifier', 'stub-notifications.jsonl'))).toBe(false);
   });
 });

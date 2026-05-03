@@ -1,4 +1,3 @@
-export function runDisable(_opts: unknown): Promise<void> {
-  console.log('disable: not yet implemented');
-  return Promise.resolve();
-}
+import { applyToggle, type EnableOpts } from './enable.js';
+
+export async function runDisable(opts: EnableOpts): Promise<void> { await applyToggle(opts, false); }
