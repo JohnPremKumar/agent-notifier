@@ -16,7 +16,7 @@ describe('config', () => {
 
   it('defaultConfig produces a valid Config with sane defaults', () => {
     const c = defaultConfig('Asia/Kolkata');
-    expect(c.version).toBe(1);
+    expect(c.version).toBe(2);
     expect(c.tz).toBe('Asia/Kolkata');
     expect(c.global.enabled).toBe(true);
     expect(c.mute).toBeNull();

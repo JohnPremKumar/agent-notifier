@@ -2,6 +2,7 @@ import {
   existsSync, mkdirSync, readFileSync, renameSync, writeFileSync,
   fsyncSync, openSync, closeSync, copyFileSync,
 } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import { ConfigSchema, type Config } from './types.js';
 
@@ -36,9 +37,11 @@ export function saveConfig(file: string, config: Config): void {
 
   // Re-init backup: timestamped snapshot if config already exists.
   // Distinct from <file>.v1.bak which is one-time pre-migration snapshot.
+  // NOTE: backups are not pruned — users with frequent saves should clear *.bak periodically.
   if (existsSync(file)) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    copyFileSync(file, `${file}.${ts}.bak`);
+    const suffix = randomBytes(2).toString('hex');
+    copyFileSync(file, `${file}.${ts}-${suffix}.bak`);
   }
 
   const tmp = `${file}.tmp`;
