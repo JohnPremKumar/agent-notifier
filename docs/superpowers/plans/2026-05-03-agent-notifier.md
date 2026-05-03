@@ -161,14 +161,14 @@ packages:
     "@types/node": "^20.12.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.2.0",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0",
-    "vitest": "^2.0.0"
+    "vitest": "^3.0.0"
   }
 }
 ```
@@ -286,16 +286,27 @@ Expected: `pnpm install` creates `pnpm-lock.yaml`; commit succeeds.
 module.exports = {
   root: true,
   parser: "@typescript-eslint/parser",
-  parserOptions: { ecmaVersion: 2022, sourceType: "module", project: ["./packages/*/tsconfig.json"] },
+  parserOptions: {
+    ecmaVersion: 2022,
+    sourceType: "module",
+    project: ["./packages/*/tsconfig.json"],
+    tsconfigRootDir: __dirname,
+  },
   plugins: ["@typescript-eslint"],
   extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended-type-checked", "prettier"],
-  ignorePatterns: ["dist", "coverage", "node_modules", "*.cjs", "*.mjs"],
+  ignorePatterns: ["dist", "coverage", "node_modules", "*.cjs", "*.mjs", "*.config.ts"],
   rules: {
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     "@typescript-eslint/consistent-type-imports": "error",
-    "no-console": ["warn", { allow: ["warn", "error"] }]
-  }
+    "no-console": ["warn", { allow: ["warn", "error"] }],
+  },
+  overrides: [
+    {
+      files: ["packages/cli/src/**/*.ts"],
+      rules: { "no-console": "off" },
+    },
+  ],
 };
 ```
 
@@ -308,7 +319,8 @@ module.exports = {
   "trailingComma": "all",
   "printWidth": 100,
   "tabWidth": 2,
-  "arrowParens": "always"
+  "arrowParens": "always",
+  "endOfLine": "lf"
 }
 ```
 
@@ -323,7 +335,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['**/*.d.ts', '**/index.ts'],
+      exclude: ['**/*.d.ts'],
       thresholds: { lines: 90, branches: 85, functions: 90, statements: 90 },
     },
     projects: [
@@ -353,7 +365,7 @@ pnpm lint
 pnpm test
 ```
 
-Expected: `lint` passes (no files yet); `test` reports "No test files found" with exit 0 (vitest treats this as success when projects are empty).
+Expected: `lint` passes (no files yet); `test` reports "No test files found" with exit 1 (vitest 3.x exits 1 when no test files match — this is normal until Task 1.1 adds tests).
 
 - [ ] **Step 6: Commit**
 
