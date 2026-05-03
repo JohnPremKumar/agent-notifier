@@ -5,20 +5,21 @@ import { OPENCODE_PLUGIN_SOURCE, type ToolName } from '@agent-notifier/core';
 
 export function createOpenCodeInstaller(opts: { home?: string } = {}) {
   const home = opts.home ?? homedir();
-  const dir = join(home, '.config', 'opencode', 'plugins');
-  const file = join(dir, 'agent-notifier.js');
+  const userConfigDir = join(home, '.config', 'opencode');
+  const pluginDir = join(userConfigDir, 'plugins');
+  const file = join(pluginDir, 'agent-notifier.js');
   const name: ToolName = 'opencode';
 
   return {
     name,
     detect(): Promise<boolean> {
-      return Promise.resolve(existsSync(dir));
+      return Promise.resolve(existsSync(userConfigDir));
     },
     isWired(): Promise<boolean> {
       return Promise.resolve(existsSync(file));
     },
     install(): Promise<void> {
-      mkdirSync(dir, { recursive: true });
+      mkdirSync(pluginDir, { recursive: true });
       writeFileSync(file, OPENCODE_PLUGIN_SOURCE, 'utf8');
       return Promise.resolve();
     },

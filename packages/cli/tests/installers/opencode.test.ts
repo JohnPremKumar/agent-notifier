@@ -6,17 +6,19 @@ import { createOpenCodeInstaller } from '../../src/lib/installers/opencode.js';
 
 describe('opencode installer', () => {
   let home: string;
+  let userConfigDir: string;
   let pluginDir: string;
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'agentoc-'));
-    pluginDir = join(home, '.config', 'opencode', 'plugins');
-    mkdirSync(pluginDir, { recursive: true });
+    userConfigDir = join(home, '.config', 'opencode');
+    pluginDir = join(userConfigDir, 'plugins');
+    mkdirSync(userConfigDir, { recursive: true });
   });
   afterEach(() => rmSync(home, { recursive: true, force: true }));
 
   const inst = () => createOpenCodeInstaller({ home });
 
-  it('install writes the plugin file', async () => {
+  it('install creates the plugins dir and writes the plugin file', async () => {
     await inst().install();
     const file = join(pluginDir, 'agent-notifier.js');
     expect(existsSync(file)).toBe(true);
@@ -36,9 +38,9 @@ describe('opencode installer', () => {
     expect(existsSync(join(pluginDir, 'agent-notifier.js'))).toBe(false);
   });
 
-  it('detect: true only when plugins dir exists', async () => {
+  it('detect: true when the user-config dir exists (independent of plugins/)', async () => {
     expect(await inst().detect()).toBe(true);
-    rmSync(pluginDir, { recursive: true });
+    rmSync(userConfigDir, { recursive: true });
     expect(await inst().detect()).toBe(false);
   });
 });
