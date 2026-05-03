@@ -2,15 +2,15 @@ import { checkbox, input, confirm, select } from '@inquirer/prompts';
 import kleur from 'kleur';
 import {
   ConfigStore,
+  configDir,
   configFilePath,
   defaultConfig,
   fireNotification,
+  stubNotifyAppend,
   type Event,
   type ToolName,
 } from '@agent-notifier/core';
 import { allInstallers, type ToolInstaller } from './install.js';
-import { existsSync, appendFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 
 function tzGuess(): string {
   try {
@@ -24,12 +24,6 @@ async function detectedTools(): Promise<ToolInstaller[]> {
   const out: ToolInstaller[] = [];
   for (const i of allInstallers()) if (await i.detect()) out.push(i);
   return out;
-}
-
-function stub(event: Event): void {
-  const dir = dirname(configFilePath());
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  appendFileSync(join(dir, 'stub-notifications.jsonl'), JSON.stringify({ event }) + '\n', 'utf8');
 }
 
 export async function runInit(): Promise<void> {
@@ -95,7 +89,7 @@ export async function runInit(): Promise<void> {
         cwd: process.cwd(),
         message: `init test ${kind}`,
       };
-      if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stub(ev);
+      if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stubNotifyAppend(configDir(), ev);
       else await fireNotification(ev);
     }
   }

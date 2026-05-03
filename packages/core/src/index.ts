@@ -7,4 +7,5 @@ export * from './schedule.js';
 export * from './suppress.js';
 export * from './idle-gate.js';
 export * from './notify.js';
+export * from './notify-stub.js';
 export * from './adapters/index.js';

@@ -1,5 +1,4 @@
-import { existsSync, appendFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import kleur from 'kleur';
 import {
   ConfigStore,
@@ -8,6 +7,7 @@ import {
   fireNotification,
   loggerFromConfig,
   logDir,
+  stubNotifyAppend,
   type Event,
 } from '@agent-notifier/core';
 import { allInstallers } from './install.js';
@@ -39,12 +39,6 @@ const TEST_EVENTS: Event[] = [
   },
 ];
 
-function stubNotify(event: Event): void {
-  const dir = configDir();
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  appendFileSync(join(dir, 'stub-notifications.jsonl'), JSON.stringify({ event }) + '\n', 'utf8');
-}
-
 export async function runDoctor(): Promise<void> {
   console.log(kleur.bold('agent-notifier doctor'));
   console.log(`platform:    ${process.platform}`);
@@ -67,7 +61,7 @@ export async function runDoctor(): Promise<void> {
 
   console.log('firing 3 test notifications…');
   for (const e of TEST_EVENTS) {
-    if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stubNotify(e);
+    if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stubNotifyAppend(configDir(), e);
     else await fireNotification(e);
   }
 

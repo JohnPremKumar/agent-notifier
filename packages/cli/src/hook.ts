@@ -10,12 +10,10 @@ import {
   loggerFromConfig,
   resolveProjectKey,
   projectDisplayName,
-  type Event,
+  stubNotifyAppend,
   type ToolName,
   ToolNameSchema,
 } from '@agent-notifier/core';
-import { existsSync, appendFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -35,13 +33,6 @@ function tzGuess(): string {
   } catch {
     return 'UTC';
   }
-}
-
-function stubNotify(event: Event): Promise<void> {
-  const dir = configDir();
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  appendFileSync(join(dir, 'stub-notifications.jsonl'), JSON.stringify({ event }) + '\n', 'utf8');
-  return Promise.resolve();
 }
 
 export async function runHook(toolFlag: string): Promise<void> {
@@ -81,7 +72,7 @@ export async function runHook(toolFlag: string): Promise<void> {
   if (!decision.fire) process.exit(0);
 
   if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') {
-    await stubNotify(event);
+    stubNotifyAppend(configDir(), event);
   } else {
     await fireNotification(event);
   }
