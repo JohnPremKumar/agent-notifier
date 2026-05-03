@@ -16,9 +16,7 @@ export function classifyCodex(payload: unknown): Event | null {
   const { event, session_id, cwd, tool, command } = parsed.data;
 
   const message =
-    tool && command ? `${tool}: ${command.join(' ').slice(0, 80)}` :
-    tool ? tool :
-    undefined;
+    tool && command ? `${tool}: ${command.join(' ').slice(0, 80)}` : tool ? tool : undefined;
 
   const base = {
     tool: 'codex' as const,
