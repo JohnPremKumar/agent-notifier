@@ -182,7 +182,7 @@ coverage/
 .DS_Store
 *.log
 *.tmp
-.bak
+*.bak
 .env
 .env.*
 !.env.example
