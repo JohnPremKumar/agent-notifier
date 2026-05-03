@@ -1,0 +1,7 @@
+{
+  "hook_event_name": "Notification",
+  "session_id": "abc123def",
+  "cwd": "/Users/x/my-app",
+  "transcript_path": "/Users/x/.claude/projects/my-app/abc.jsonl",
+  "message": "Claude needs your permission to use Bash"
+}

@@ -1,0 +1,6 @@
+{
+  "hook_event_name": "Notification",
+  "session_id": "abc123def",
+  "cwd": "/Users/x/my-app",
+  "message": "Claude is waiting for your input"
+}
