@@ -1,6 +1,13 @@
 import {
-  existsSync, mkdirSync, readFileSync, renameSync, writeFileSync,
-  fsyncSync, openSync, closeSync, copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+  fsyncSync,
+  openSync,
+  closeSync,
+  copyFileSync,
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';

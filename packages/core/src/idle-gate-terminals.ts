@@ -50,12 +50,34 @@ const TERMINAL_PROCESSES_WIN32: ReadonlySet<string> = new Set([
   'Windsurf.exe',
 ]);
 
+// `ps -o comm=` basenames for the same set of supported terminals on macOS/Linux.
+// Used by the process-tree walk (walkUpToTerminal) — distinct shape from bundle ids
+// (frontmost detection) but the same conceptual list of "terminals we recognize".
+export const TERMINAL_COMMS_POSIX: ReadonlySet<string> = new Set([
+  'Terminal',
+  'iTerm2',
+  'Ghostty',
+  'WezTerm',
+  'Alacritty',
+  'kitty',
+  'Hyper',
+  'Warp',
+  'Code',
+  'Cursor',
+  'Windsurf',
+  'Zed',
+]);
+
 export function isTerminalBundle(bundle: string): boolean {
   return TERMINAL_BUNDLES_DARWIN.has(bundle);
 }
 
 export function isTerminalProcess(name: string): boolean {
   return TERMINAL_PROCESSES_WIN32.has(name);
+}
+
+export function isTerminalComm(comm: string): boolean {
+  return TERMINAL_COMMS_POSIX.has(comm);
 }
 
 const TAB_LOOKUP_DARWIN: Readonly<Record<string, TabLookup>> = {

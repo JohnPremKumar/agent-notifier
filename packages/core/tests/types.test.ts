@@ -46,9 +46,7 @@ describe('ConfigSchema v2', () => {
   });
 
   it('rejects unknown fields under strict zod', () => {
-    expect(() =>
-      ConfigSchema.parse({ version: 2, tz: 'UTC', bogusField: true }),
-    ).toThrow();
+    expect(() => ConfigSchema.parse({ version: 2, tz: 'UTC', bogusField: true })).toThrow();
   });
 
   it('rejects v1 directly (migration handles upgrade)', () => {
@@ -61,13 +59,15 @@ describe('ConfigSchema v2', () => {
       tz: 'America/New_York',
       global: { enabled: true },
       mute: { until: '2026-12-31T23:59:59.000Z' },
-      schedules: [{
-        id: 'work',
-        type: 'allow' as const,
-        days: ['mon' as const, 'tue' as const, 'wed' as const, 'thu' as const, 'fri' as const],
-        from: '09:00',
-        to: '18:00',
-      }],
+      schedules: [
+        {
+          id: 'work',
+          type: 'allow' as const,
+          days: ['mon' as const, 'tue' as const, 'wed' as const, 'thu' as const, 'fri' as const],
+          from: '09:00',
+          to: '18:00',
+        },
+      ],
       tools: {
         'claude-code': { enabled: true },
         codex: { enabled: false },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isTerminalBundle,
+  isTerminalComm,
   isTerminalProcess,
   getTabLookupForBundle,
 } from '../src/idle-gate-terminals.js';
@@ -14,6 +15,17 @@ describe('idle-gate-terminals', () => {
     expect(isTerminalBundle('com.google.Chrome')).toBe(false);
     expect(isTerminalBundle('com.tinyspeck.slackmacgap')).toBe(false);
     expect(isTerminalBundle('')).toBe(false);
+  });
+
+  it('classifies known terminal comm names on macOS/Linux (process tree walk)', () => {
+    expect(isTerminalComm('Terminal')).toBe(true);
+    expect(isTerminalComm('iTerm2')).toBe(true);
+    expect(isTerminalComm('Ghostty')).toBe(true);
+    expect(isTerminalComm('Alacritty')).toBe(true);
+    expect(isTerminalComm('Code')).toBe(true);
+    expect(isTerminalComm('bash')).toBe(false);
+    expect(isTerminalComm('node')).toBe(false);
+    expect(isTerminalComm('')).toBe(false);
   });
 
   it('classifies known terminal processes on Windows', () => {

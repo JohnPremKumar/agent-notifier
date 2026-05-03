@@ -1,5 +1,6 @@
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
+import { isTerminalComm } from './idle-gate-terminals.js';
 
 const execAsync = promisify(execCb);
 
@@ -58,23 +59,9 @@ export async function getIdleSeconds(opts: GetIdleOptions = {}): Promise<number>
 
 const SHELLS: ReadonlySet<string> = new Set(['bash', 'sh', 'zsh', 'fish', 'dash']);
 const AI_EXES: ReadonlySet<string> = new Set(['claude', 'codex', 'gemini', 'opencode']);
-const TERMINAL_EXES: ReadonlySet<string> = new Set([
-  'Terminal',
-  'iTerm2',
-  'Ghostty',
-  'WezTerm',
-  'Alacritty',
-  'kitty',
-  'Hyper',
-  'Warp',
-  'Code',
-  'Cursor',
-  'Windsurf',
-  'Zed',
-]);
 const MAX_DEPTH = 8;
 
-// Strip any path prefix so set membership checks (SHELLS/AI_EXES/TERMINAL_EXES)
+// Strip any path prefix so set membership checks (SHELLS/AI_EXES/isTerminalComm)
 // stay simple even when ps -o comm= returns an absolute path (macOS does this
 // for non-shell processes).
 function basename(comm: string): string {
@@ -164,7 +151,7 @@ export async function walkUpToTerminal(
     if (pid === null || pid <= 1) return null;
     const comm = await getProcessComm(pid, opts);
     const base = basename(comm);
-    if (TERMINAL_EXES.has(base)) return base;
+    if (isTerminalComm(base)) return base;
     pid = await getProcessPpid(pid, opts);
   }
   return null;
