@@ -1,0 +1,7 @@
+{
+  "event_name": "Notification",
+  "session_id": "gem-42",
+  "cwd": "/Users/x/gemini-app",
+  "notification_type": "idle",
+  "message": "Awaiting input"
+}
