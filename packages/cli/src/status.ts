@@ -10,7 +10,6 @@ import {
   Logger,
   logDir,
   resolveProjectKey,
-  type ToolName,
 } from '@agent-notifier/core';
 import { allInstallers } from './install.js';
 
@@ -25,13 +24,16 @@ export async function runStatus(): Promise<void> {
   const c = store.load();
   console.log(kleur.bold(`agent-notifier ${VERSION} · ${process.platform} · ${configDir()}`));
   console.log('');
-  console.log(`Global:        ${c.global.enabled ? kleur.green('enabled') : kleur.red('disabled')}`);
+  console.log(
+    `Global:        ${c.global.enabled ? kleur.green('enabled') : kleur.red('disabled')}`,
+  );
   console.log(`Muted:         ${c.mute ? kleur.yellow(`until ${c.mute.until}`) : 'no'}`);
 
   if (c.schedules.length === 0) console.log(`Schedules:     ${kleur.gray('(none)')}`);
   else {
     console.log(`Schedules:`);
-    for (const s of c.schedules) console.log(`  [${s.id}] ${s.type} ${s.days.join(',')} ${s.from}-${s.to}`);
+    for (const s of c.schedules)
+      console.log(`  [${s.id}] ${s.type} ${s.days.join(',')} ${s.from}-${s.to}`);
   }
 
   process.stdout.write('Tools:         ');
@@ -39,7 +41,7 @@ export async function runStatus(): Promise<void> {
   const tools: string[] = [];
   for (const inst of installers) {
     const wired = (await inst.detect()) ? await inst.isWired() : false;
-    const enabled = c.tools[inst.name as ToolName]?.enabled ?? true;
+    const enabled = c.tools[inst.name]?.enabled ?? true;
     const sym = !wired ? kleur.gray('✗') : enabled ? kleur.green('✓') : kleur.yellow('○');
     tools.push(`${sym} ${inst.name}`);
   }
@@ -59,9 +61,7 @@ export async function runStatus(): Promise<void> {
   }
 
   const idle = await getIdleSeconds();
-  console.log(
-    `Idle gate:     ON (last activity ${idle === Infinity ? '?' : `${idle}s ago`})`,
-  );
+  console.log(`Idle gate:     ON (last activity ${idle === Infinity ? '?' : `${idle}s ago`})`);
 
   const log = new Logger({ dir: logDir(), maxBytes: 1_000_000, generations: 3 });
   const tail = log.readTail(5);

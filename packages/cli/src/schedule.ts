@@ -1,5 +1,10 @@
 import kleur from 'kleur';
-import { ConfigStore, configFilePath, ScheduleRuleSchema, type ScheduleRule } from '@agent-notifier/core';
+import {
+  ConfigStore,
+  configFilePath,
+  ScheduleRuleSchema,
+  type ScheduleRule,
+} from '@agent-notifier/core';
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 type Day = (typeof DAYS)[number];

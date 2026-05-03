@@ -9,7 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIN = join(__dirname, '..', '..', 'bin', 'agent-notifier.js');
 
 describe('status', () => {
-  let home: string; let project: string;
+  let home: string;
+  let project: string;
   beforeEach(() => {
     home = realpathSync(mkdtempSync(join(tmpdir(), 'agentst-')));
     project = join(home, 'p');
@@ -21,10 +22,31 @@ describe('status', () => {
 
   it('renders all sections (global, mute, schedules, tools, current project)', () => {
     execFileSync('node', [BIN, 'mute', '1h'], { env: env() });
-    execFileSync('node', [BIN, 'schedule', 'add', '--allow', '--days', 'mon', '--from', '09:00', '--to', '18:00', '--id', 'work'], { env: env() });
+    execFileSync(
+      'node',
+      [
+        BIN,
+        'schedule',
+        'add',
+        '--allow',
+        '--days',
+        'mon',
+        '--from',
+        '09:00',
+        '--to',
+        '18:00',
+        '--id',
+        'work',
+      ],
+      { env: env() },
+    );
     execFileSync('node', [BIN, 'disable', '--tool', 'codex'], { env: env() });
     execFileSync('node', [BIN, 'enable'], { env: env(), cwd: project });
-    const out = execFileSync('node', [BIN, 'status'], { env: env(), cwd: project, encoding: 'utf8' });
+    const out = execFileSync('node', [BIN, 'status'], {
+      env: env(),
+      cwd: project,
+      encoding: 'utf8',
+    });
     expect(out).toContain('Global:');
     expect(out).toContain('Muted:');
     expect(out).toContain('Schedules:');

@@ -99,9 +99,18 @@ sched
   .option('--from <hhmm>')
   .option('--to <hhmm>')
   .option('--id <name>')
-  .action(async (opts) => {
-    (await import('./schedule.js')).runScheduleAdd(opts);
-  });
+  .action(
+    async (opts: {
+      allow?: boolean;
+      deny?: boolean;
+      days?: string;
+      from?: string;
+      to?: string;
+      id?: string;
+    }) => {
+      (await import('./schedule.js')).runScheduleAdd(opts);
+    },
+  );
 sched.command('remove <id>').action(async (id: string) => {
   (await import('./schedule.js')).runScheduleRemove(id);
 });
