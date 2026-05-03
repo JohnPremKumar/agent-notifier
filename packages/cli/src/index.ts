@@ -56,7 +56,7 @@ program
   .option('--global')
   .option('--project [path]')
   .option('--tool <tool>')
-  .action(async (opts) => {
+  .action(async (opts: { global?: boolean; project?: string | true; tool?: string }) => {
     const { runEnable } = await import('./enable.js');
     await runEnable(opts);
   });
@@ -67,7 +67,7 @@ program
   .option('--global')
   .option('--project [path]')
   .option('--tool <tool>')
-  .action(async (opts) => {
+  .action(async (opts: { global?: boolean; project?: string | true; tool?: string }) => {
     const { runDisable } = await import('./disable.js');
     await runDisable(opts);
   });
