@@ -1,31 +1,46 @@
 import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-  fsyncSync,
-  openSync,
-  closeSync,
+  existsSync, mkdirSync, readFileSync, renameSync, writeFileSync,
+  fsyncSync, openSync, closeSync, copyFileSync,
 } from 'node:fs';
 import { dirname } from 'node:path';
 import { ConfigSchema, type Config } from './types.js';
 
 export function defaultConfig(tz: string): Config {
-  return ConfigSchema.parse({ version: 1, tz });
+  return ConfigSchema.parse({ version: 2, tz });
+}
+
+function isObject(x: unknown): x is Record<string, unknown> {
+  return typeof x === 'object' && x !== null && !Array.isArray(x);
+}
+
+function migrate(raw: unknown, file: string): unknown {
+  if (!isObject(raw)) return raw;
+  if (raw['version'] === 1) {
+    const backup = `${file}.v1.bak`;
+    if (existsSync(file) && !existsSync(backup)) copyFileSync(file, backup);
+    return { ...raw, version: 2 };
+  }
+  return raw;
 }
 
 export function loadConfig(file: string, fallbackTz: string): Config {
   if (!existsSync(file)) return defaultConfig(fallbackTz);
-  const raw = readFileSync(file, 'utf8');
-  const parsed: unknown = JSON.parse(raw);
-  return ConfigSchema.parse(parsed);
+  const raw: unknown = JSON.parse(readFileSync(file, 'utf8'));
+  return ConfigSchema.parse(migrate(raw, file));
 }
 
 export function saveConfig(file: string, config: Config): void {
-  ConfigSchema.parse(config); // throws on invalid
+  ConfigSchema.parse(config);
   const dir = dirname(file);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  // Re-init backup: timestamped snapshot if config already exists.
+  // Distinct from <file>.v1.bak which is one-time pre-migration snapshot.
+  if (existsSync(file)) {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    copyFileSync(file, `${file}.${ts}.bak`);
+  }
+
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, JSON.stringify(config, null, 2), 'utf8');
   const fd = openSync(tmp, 'r');
