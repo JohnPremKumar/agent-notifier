@@ -1,5 +1,5 @@
 // packages/core/tests/idle-gate.test.ts
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,8 +14,12 @@ import {
   getProcessComm,
   getProcessPpid,
   getFrontmostBundle,
+  decideGate,
+  clearGateCache,
   type ExecFn,
 } from '../src/idle-gate.js';
+import type { Config } from '../src/types.js';
+import { defaultConfig } from '../src/config.js';
 
 // ESM: __dirname is not available in "type":"module" packages, so we derive it.
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -214,5 +218,301 @@ describe('getFrontmostBundle', () => {
     const exec = vi.fn().mockResolvedValue({ stdout: 'com.apple.Terminal\n', stderr: '' });
     await getFrontmostBundle({ exec, platform: 'darwin' });
     expect(exec.mock.calls[0]?.[1]).toEqual({ timeout: 200 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// chainStub: builds an ExecFn that handles the full decideGate call surface.
+//
+// Process table: maps pid string → { ppid, comm, tty }
+// frontmost:    return value for the "frontmost is true" osascript query
+// activeTabTty: return value for Terminal/iTerm2 tab-tty osascript queries
+// idleSeconds:  HIDIdleTime in seconds (converted to ns for ioreg output)
+// ---------------------------------------------------------------------------
+function chainStub(
+  procs: Record<string, { ppid: string; comm: string; tty: string }>,
+  frontmost?: string,
+  activeTabTty?: string,
+  idleSeconds?: number,
+): ExecFn {
+  return (cmd) => {
+    // ps queries
+    const m = cmd.match(/-p (\d+)/);
+    if (m) {
+      const pid = m[1]!;
+      const row = procs[pid];
+      if (!row) return Promise.resolve({ stdout: '', stderr: '' });
+      if (cmd.includes('ppid=')) return Promise.resolve({ stdout: row.ppid + '\n', stderr: '' });
+      if (cmd.includes('comm=')) return Promise.resolve({ stdout: row.comm + '\n', stderr: '' });
+      if (cmd.includes('tty=')) return Promise.resolve({ stdout: row.tty + '\n', stderr: '' });
+      return Promise.resolve({ stdout: '', stderr: '' });
+    }
+    // ioreg idle time
+    if (cmd.startsWith('ioreg')) {
+      const ns = ((idleSeconds ?? 0) * 1_000_000_000).toString();
+      return Promise.resolve({ stdout: `"HIDIdleTime" = ${ns}`, stderr: '' });
+    }
+    // osascript: frontmost bundle
+    if (cmd.includes('frontmost is true')) {
+      return Promise.resolve({ stdout: (frontmost ?? '') + '\n', stderr: '' });
+    }
+    // osascript: Terminal.app selected tab tty
+    if (cmd.includes('selected tab of front window')) {
+      return Promise.resolve({ stdout: (activeTabTty ?? '') + '\n', stderr: '' });
+    }
+    // osascript: iTerm2 current session tty
+    if (cmd.includes('current session of current window')) {
+      return Promise.resolve({ stdout: (activeTabTty ?? '') + '\n', stderr: '' });
+    }
+    return Promise.resolve({ stdout: '', stderr: '' });
+  };
+}
+
+// Helper: build a Config with idleGate overrides applied
+function cfg(overrides: Partial<Config['idleGate']> = {}): Config {
+  const c = defaultConfig('UTC');
+  Object.assign(c.idleGate, overrides);
+  return c;
+}
+
+// Standard process tree used across multiple tests:
+//   hook(99) ← bash(98) ← claude(97) ← iTerm2(96)
+// hookPpid passed to decideGate = 99
+const STANDARD_PROCS: Record<string, { ppid: string; comm: string; tty: string }> = {
+  '99': { ppid: '98', comm: 'bash', tty: 'ttys003' },
+  '98': { ppid: '97', comm: 'bash', tty: 'ttys003' },
+  '97': { ppid: '96', comm: 'claude', tty: 'ttys003' },
+  '96': { ppid: '1', comm: 'iTerm2', tty: '??' },
+};
+const HOOK_PPID = 99;
+
+describe('decideGate (full decision tree)', () => {
+  beforeEach(() => {
+    clearGateCache();
+  });
+
+  // 1. PERMISSION always fires regardless of mode/frontmost
+  it('PERMISSION always fires regardless of mode/frontmost', async () => {
+    // exec should never be called — PERMISSION short-circuits before any OS probe
+    const exec = vi.fn<ExecFn>();
+    const result = await decideGate(cfg({ mode: 'fire-elsewhere' }), 'PERMISSION', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('permission-bypass');
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  // 2. always-fire mode short-circuits without consulting OS
+  it('always-fire mode fires every event without consulting OS', async () => {
+    const exec = vi.fn<ExecFn>();
+    const result = await decideGate(cfg({ mode: 'always-fire' }), 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(true);
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  // 3. fire-elsewhere: frontmost is Chrome → fire
+  it('fires when frontmost ≠ AI terminal (frontmost-other-app)', async () => {
+    const exec = chainStub(STANDARD_PROCS, 'com.google.Chrome', undefined, 5);
+    const result = await decideGate(cfg(), 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('frontmost-other-app');
+  });
+
+  // 4. fire-elsewhere: frontmost = iTerm2, active tab tty matches AI tty → suppress
+  it('suppresses when active tab TTY matches AI TTY (frontmost-same-tab)', async () => {
+    // AI process tty is ttys003; iTerm2's active tab also reports ttys003
+    const exec = chainStub(STANDARD_PROCS, 'com.googlecode.iterm2', 'ttys003', 5);
+    const result = await decideGate(cfg(), 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(false);
+    expect(result.reason).toBe('frontmost-same-tab');
+  });
+
+  // 5. fire-elsewhere: frontmost = iTerm2, active tab tty differs → fire
+  it('fires when frontmost is AI terminal but different tab (frontmost-different-tab)', async () => {
+    // AI process tty is ttys003; active tab reports ttys007 (different tab)
+    const exec = chainStub(STANDARD_PROCS, 'com.googlecode.iterm2', 'ttys007', 5);
+    const result = await decideGate(cfg(), 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('frontmost-different-tab');
+  });
+
+  // 6. fire-elsewhere: frontmost = Ghostty (no tab lookup), policy='fire' → fire
+  it('fires on unsupported terminal (Ghostty) with policy=fire (unsupported-terminal-fired)', async () => {
+    const exec = chainStub(
+      {
+        ...STANDARD_PROCS,
+        // Override: walkUpToTerminal needs to find Ghostty comm in the tree
+        '96': { ppid: '1', comm: 'Ghostty', tty: '??' },
+      },
+      'com.mitchellh.ghostty',
+      undefined,
+      5,
+    );
+    const result = await decideGate(
+      cfg({ unsupportedTerminalPolicy: 'fire' }),
+      'TURN_DONE',
+      HOOK_PPID,
+      {
+        exec,
+        platform: 'darwin',
+      },
+    );
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('unsupported-terminal-fired');
+  });
+
+  // 7. fire-elsewhere: frontmost = Ghostty, policy='gate', idle < threshold → suppress
+  it('suppresses on unsupported terminal with policy=gate + idle below threshold (unsupported-terminal-gated)', async () => {
+    const exec = chainStub(
+      {
+        ...STANDARD_PROCS,
+        '96': { ppid: '1', comm: 'Ghostty', tty: '??' },
+      },
+      'com.mitchellh.ghostty',
+      undefined,
+      10, // 10s idle, threshold is 60s default
+    );
+    const result = await decideGate(
+      cfg({ unsupportedTerminalPolicy: 'gate', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec, platform: 'darwin' },
+    );
+    expect(result.fire).toBe(false);
+    expect(result.reason).toBe('unsupported-terminal-gated');
+  });
+
+  // 8. fire-elsewhere: frontmost = Ghostty, policy='gate', idle >= threshold → fire
+  it('fires on unsupported terminal with policy=gate when OS idle threshold exceeded', async () => {
+    const exec = chainStub(
+      {
+        ...STANDARD_PROCS,
+        '96': { ppid: '1', comm: 'Ghostty', tty: '??' },
+      },
+      'com.mitchellh.ghostty',
+      undefined,
+      90, // 90s idle, threshold is 60s
+    );
+    const result = await decideGate(
+      cfg({ unsupportedTerminalPolicy: 'gate', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec, platform: 'darwin' },
+    );
+    expect(result.fire).toBe(true);
+    // applyOsIdleGate fires with frontmost-different-tab when idle >= threshold
+    expect(result.reason).toBe('frontmost-different-tab');
+  });
+
+  // 9. AppleScript permission-denied (osascript throws) → fail-open fire
+  it('fires (fail-open) when osascript throws permission-denied error', async () => {
+    const permError = new Error('1743: not allowed assistive access');
+    // ps queries succeed; osascript frontmost query throws
+    const exec: ExecFn = (cmd) => {
+      const m = cmd.match(/-p (\d+)/);
+      if (m) {
+        const pid = m[1]!;
+        const row = STANDARD_PROCS[pid];
+        if (!row) return Promise.resolve({ stdout: '', stderr: '' });
+        if (cmd.includes('ppid=')) return Promise.resolve({ stdout: row.ppid + '\n', stderr: '' });
+        if (cmd.includes('comm=')) return Promise.resolve({ stdout: row.comm + '\n', stderr: '' });
+        if (cmd.includes('tty=')) return Promise.resolve({ stdout: row.tty + '\n', stderr: '' });
+      }
+      if (cmd.includes('frontmost is true')) return Promise.reject(permError);
+      return Promise.resolve({ stdout: '', stderr: '' });
+    };
+    const result = await decideGate(cfg(), 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('fail-open');
+  });
+
+  // 10. strict-terminal mode: frontmost = iTerm2 (AI terminal), idle < threshold → suppress
+  it('strict-terminal mode suppresses when AI terminal frontmost and idle below threshold', async () => {
+    const exec = chainStub(STANDARD_PROCS, 'com.googlecode.iterm2', undefined, 10);
+    const result = await decideGate(
+      cfg({ mode: 'strict-terminal', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec, platform: 'darwin' },
+    );
+    expect(result.fire).toBe(false);
+    expect(result.reason).toBe('frontmost-same-tab');
+  });
+
+  // 11. strict-os-idle mode: ignores process tree, only consults idle seconds
+  it('strict-os-idle mode fires when idle >= threshold, suppresses otherwise', async () => {
+    // exec should only be called for ioreg — no ps or osascript calls needed
+    const execFired = chainStub({}, undefined, undefined, 90);
+    const resultFired = await decideGate(
+      cfg({ mode: 'strict-os-idle', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: execFired, platform: 'darwin' },
+    );
+    expect(resultFired.fire).toBe(true);
+
+    clearGateCache();
+    const execSuppressed = chainStub({}, undefined, undefined, 30);
+    const resultSuppressed = await decideGate(
+      cfg({ mode: 'strict-os-idle', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: execSuppressed, platform: 'darwin' },
+    );
+    expect(resultSuppressed.fire).toBe(false);
+  });
+
+  // 12. cache: identical (kind, ppid, mode) within 2s returns cached result without calling exec
+  it('caches results for 2s under same (kind, ppid, mode) key', async () => {
+    const exec = vi.fn(chainStub(STANDARD_PROCS, 'com.google.Chrome', undefined, 5));
+    const config = cfg();
+
+    // First call: triggers full evaluation
+    const first = await decideGate(config, 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    const callsAfterFirst = exec.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    // Second call with same key: should return cached, no new exec calls
+    const second = await decideGate(config, 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(exec.mock.calls.length).toBe(callsAfterFirst);
+    expect(second).toEqual(first);
+  });
+
+  // 13. cache: clearGateCache() forces a fresh evaluation
+  it('clearGateCache() invalidates cached results', async () => {
+    const exec = vi.fn(chainStub(STANDARD_PROCS, 'com.google.Chrome', undefined, 5));
+    const config = cfg();
+
+    await decideGate(config, 'TURN_DONE', HOOK_PPID, { exec, platform: 'darwin' });
+    const callsAfterFirst = exec.mock.calls.length;
+
+    clearGateCache();
+
+    // After cache clear, a fresh call must invoke exec again
+    await decideGate(config, 'TURN_DONE', HOOK_PPID, { exec, platform: 'darwin' });
+    expect(exec.mock.calls.length).toBeGreaterThan(callsAfterFirst);
   });
 });
