@@ -1,6 +1,34 @@
 {
   "name": "agent-notifier",
   "version": "0.0.0",
+  "description": "Cross-platform desktop notifier for AI coding CLIs (Claude Code, Codex, Gemini, OpenCode).",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "codex",
+    "gemini",
+    "opencode",
+    "cli",
+    "notifier",
+    "macos",
+    "windows",
+    "hooks",
+    "agents"
+  ],
+  "author": "Johnpremkumar Srinivasan <johnpk305@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/<owner>/agent-notifier",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<owner>/agent-notifier.git"
+  },
+  "bugs": {
+    "url": "https://github.com/<owner>/agent-notifier/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "bin": {
     "agent-notifier": "./bin/agent-notifier.js"

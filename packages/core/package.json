@@ -1,6 +1,34 @@
 {
   "name": "@agent-notifier/core",
   "version": "0.0.0",
+  "description": "Internal core for agent-notifier.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "codex",
+    "gemini",
+    "opencode",
+    "cli",
+    "notifier",
+    "macos",
+    "windows",
+    "hooks",
+    "agents"
+  ],
+  "author": "Johnpremkumar Srinivasan <johnpk305@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/<owner>/agent-notifier",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<owner>/agent-notifier.git"
+  },
+  "bugs": {
+    "url": "https://github.com/<owner>/agent-notifier/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
