@@ -1,0 +1,7 @@
+{
+  "event": "PermissionRequest",
+  "session_id": "cdx-9001",
+  "cwd": "/Users/x/codex-app",
+  "tool": "shell",
+  "command": ["rm", "-rf", "node_modules"]
+}
