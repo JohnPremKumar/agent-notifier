@@ -1,14 +1,18 @@
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
-import { isTerminalComm, isTerminalBundle, getTabLookupForBundle } from './idle-gate-terminals.js';
+import {
+  isTerminalComm,
+  isTerminalFrontmost,
+  getTabLookupForBundle,
+  type ExecFn,
+} from './idle-gate-terminals.js';
 import type { Config, Kind } from './types.js';
 
 const execAsync = promisify(execCb);
 
-export type ExecFn = (
-  cmd: string,
-  opts?: { timeout?: number },
-) => Promise<{ stdout: string; stderr: string }>;
+// Re-export ExecFn from idle-gate-terminals.ts (single source of truth) so that
+// existing imports from this module continue to work unchanged.
+export type { ExecFn } from './idle-gate-terminals.js';
 
 export interface GetIdleOptions {
   exec?: ExecFn;
@@ -203,9 +207,13 @@ export async function getFrontmostBundle(opts: GetIdleOptions = {}): Promise<str
 
 export type GateDecision =
   | 'permission-bypass'
+  | 'mode-always-fire' // short-circuit from always-fire mode (no OS probe performed)
   | 'frontmost-other-app'
   | 'frontmost-different-tab'
   | 'frontmost-same-tab'
+  | 'frontmost-same-terminal' // strict-terminal suppress: terminal frontmost but no tab check
+  | 'os-idle-elapsed' // fired because OS idle time exceeded threshold (strict-os-idle)
+  | 'os-active' // suppressed because OS is active (strict-os-idle)
   | 'unsupported-terminal-fired'
   | 'unsupported-terminal-gated'
   | 'fail-open';
@@ -248,9 +256,9 @@ export async function decideGate(
   if (kind === 'PERMISSION') return { fire: true, reason: 'permission-bypass' };
 
   const mode = config.idleGate.mode;
-  if (mode === 'always-fire') return { fire: true, reason: 'frontmost-other-app' };
+  if (mode === 'always-fire') return { fire: true, reason: 'mode-always-fire' };
 
-  const cacheKey = `${kind}:${hookPpid}:${mode}`;
+  const cacheKey = `${kind}:${hookPpid}:${mode}:${config.idleGate.unsupportedTerminalPolicy}`;
   const hit = gateCache.get(cacheKey);
   if (hit && Date.now() - hit.ts < CACHE_MS) return hit.value;
 
@@ -260,8 +268,8 @@ export async function decideGate(
       const idle = await getIdleSeconds(opts);
       result =
         idle >= config.idleGate.thresholdSeconds
-          ? { fire: true, reason: 'frontmost-other-app' }
-          : { fire: false, reason: 'frontmost-same-tab' };
+          ? { fire: true, reason: 'os-idle-elapsed' }
+          : { fire: false, reason: 'os-active' };
     } else {
       result = await decideFireElsewhere(config, hookPpid, mode, opts);
     }
@@ -285,19 +293,28 @@ async function decideFireElsewhere(
   const aiTty = await getProcessTty(aiPid, opts);
   if (aiTty === null) return { fire: true, reason: 'fail-open' };
 
+  // aiTerminalExe is checked for null only — confirms the AI process tree leads to
+  // a known terminal before we trust the frontmost-vs-tab comparison. The exe name
+  // itself is intentionally not compared against frontmost; TTY equality below is
+  // the load-bearing check.
   const aiTerminalExe = await walkUpToTerminal(aiPid, opts);
   if (aiTerminalExe === null) return { fire: true, reason: 'fail-open' };
 
   const frontmost = await getFrontmostBundle(opts);
   if (frontmost === null) return { fire: true, reason: 'fail-open' };
 
-  if (!isTerminalBundle(frontmost)) return { fire: true, reason: 'frontmost-other-app' };
+  const platform = opts.platform ?? process.platform;
+  if (!isTerminalFrontmost(frontmost, platform))
+    return { fire: true, reason: 'frontmost-other-app' };
 
   if (mode === 'strict-terminal') {
     const idle = await getIdleSeconds(opts);
+    // Fire: AI's terminal is frontmost but user appears to be in a different tab (idle ≥ threshold).
+    // Suppress: terminal frontmost and user is active — likely watching the AI work in the same terminal.
+    // Note: no tab lookup performed here; idle time is used as a proxy (hence 'frontmost-same-terminal').
     return idle >= config.idleGate.thresholdSeconds
       ? { fire: true, reason: 'frontmost-different-tab' }
-      : { fire: false, reason: 'frontmost-same-tab' };
+      : { fire: false, reason: 'frontmost-same-terminal' };
   }
 
   const lookup = getTabLookupForBundle(frontmost);

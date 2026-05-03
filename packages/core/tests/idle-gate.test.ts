@@ -312,6 +312,7 @@ describe('decideGate (full decision tree)', () => {
       platform: 'darwin',
     });
     expect(result.fire).toBe(true);
+    expect(result.reason).toBe('mode-always-fire');
     expect(exec).not.toHaveBeenCalled();
   });
 
@@ -453,7 +454,7 @@ describe('decideGate (full decision tree)', () => {
       { exec, platform: 'darwin' },
     );
     expect(result.fire).toBe(false);
-    expect(result.reason).toBe('frontmost-same-tab');
+    expect(result.reason).toBe('frontmost-same-terminal');
   });
 
   // 11. strict-os-idle mode: ignores process tree, only consults idle seconds
@@ -467,6 +468,7 @@ describe('decideGate (full decision tree)', () => {
       { exec: execFired, platform: 'darwin' },
     );
     expect(resultFired.fire).toBe(true);
+    expect(resultFired.reason).toBe('os-idle-elapsed');
 
     clearGateCache();
     const execSuppressed = chainStub({}, undefined, undefined, 30);
@@ -477,6 +479,7 @@ describe('decideGate (full decision tree)', () => {
       { exec: execSuppressed, platform: 'darwin' },
     );
     expect(resultSuppressed.fire).toBe(false);
+    expect(resultSuppressed.reason).toBe('os-active');
   });
 
   // 12. cache: identical (kind, ppid, mode) within 2s returns cached result without calling exec
@@ -514,5 +517,171 @@ describe('decideGate (full decision tree)', () => {
     // After cache clear, a fresh call must invoke exec again
     await decideGate(config, 'TURN_DONE', HOOK_PPID, { exec, platform: 'darwin' });
     expect(exec.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+  });
+
+  // FIX 1 — Windows: frontmost = WindowsTerminal.exe (AI terminal), policy=gate, idle < threshold → suppress
+  // Verifies isTerminalFrontmost dispatches to isTerminalProcess on win32 (not isTerminalBundle,
+  // which would always return false for .exe names and wrongly produce frontmost-other-app).
+  //
+  // The process tree walk (walkUpToTerminal) uses isTerminalComm, which recognizes POSIX comm
+  // names. On Windows, ps-based queries are mocked; we use 'iTerm2' as the comm so the walk
+  // succeeds and we reach the isTerminalFrontmost check. The critical assertion is that
+  // 'WindowsTerminal.exe' is recognized as a terminal on win32 (not treated as an unknown app).
+  it('win32: WindowsTerminal.exe frontmost with policy=gate suppresses (not frontmost-other-app)', async () => {
+    // process tree: hookPpid=99 → bash(98) → claude(97) ← iTerm2(96)
+    // (using iTerm2 comm so walkUpToTerminal succeeds; the frontmost check is what FIX 1 tests)
+    const WIN_PROCS: Record<string, { ppid: string; comm: string; tty: string }> = {
+      '99': { ppid: '98', comm: 'bash', tty: 'ttys001' },
+      '98': { ppid: '97', comm: 'bash', tty: 'ttys001' },
+      '97': { ppid: '96', comm: 'claude', tty: 'ttys001' },
+      '96': { ppid: '1', comm: 'iTerm2', tty: '??' },
+    };
+    // On win32, getIdleSeconds calls the PowerShell WIN_CMD (starts with 'powershell').
+    // chainStub only handles ioreg; build a bespoke exec that handles both ps and powershell.
+    const winExec: ExecFn = (cmd) => {
+      const m = cmd.match(/-p (\d+)/);
+      if (m) {
+        const pid = m[1]!;
+        const row = WIN_PROCS[pid];
+        if (!row) return Promise.resolve({ stdout: '', stderr: '' });
+        if (cmd.includes('ppid=')) return Promise.resolve({ stdout: row.ppid + '\n', stderr: '' });
+        if (cmd.includes('comm=')) return Promise.resolve({ stdout: row.comm + '\n', stderr: '' });
+        if (cmd.includes('tty=')) return Promise.resolve({ stdout: row.tty + '\n', stderr: '' });
+        return Promise.resolve({ stdout: '', stderr: '' });
+      }
+      // win32 frontmost: PowerShell GetForegroundWindow returns "WindowsTerminal" (no .exe)
+      if (cmd.includes('GetForegroundWindow')) {
+        return Promise.resolve({ stdout: 'WindowsTerminal\n', stderr: '' });
+      }
+      // win32 idle: PowerShell GetLastInputInfo — return 10s (below 60s threshold)
+      if (cmd.includes('GetLastInputInfo')) {
+        return Promise.resolve({ stdout: '10\n', stderr: '' });
+      }
+      return Promise.resolve({ stdout: '', stderr: '' });
+    };
+    const result = await decideGate(
+      cfg({ mode: 'fire-elsewhere', unsupportedTerminalPolicy: 'gate', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: winExec, platform: 'win32' },
+    );
+    // WindowsTerminal.exe IS a known terminal on win32, so we should NOT get frontmost-other-app.
+    // Falls through to unsupportedTerminalPolicy='gate' (no Windows tab lookup exists yet)
+    // with idle=10 < threshold=60, so fire=false.
+    expect(result.reason).not.toBe('frontmost-other-app');
+    expect(result.fire).toBe(false);
+    expect(result.reason).toBe('unsupported-terminal-gated');
+  });
+
+  // FIX 1 — darwin control: com.google.Chrome is not a terminal → frontmost-other-app
+  // Confirms the isTerminalFrontmost rename did not regress the darwin path.
+  it('darwin: com.google.Chrome frontmost returns frontmost-other-app', async () => {
+    const exec = chainStub(STANDARD_PROCS, 'com.google.Chrome', undefined, 5);
+    const result = await decideGate(cfg({ mode: 'fire-elsewhere' }), 'TURN_DONE', HOOK_PPID, {
+      exec,
+      platform: 'darwin',
+    });
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('frontmost-other-app');
+  });
+
+  // FIX 2 — cache key includes unsupportedTerminalPolicy: different policies produce different results
+  it('cache key isolates results across different unsupportedTerminalPolicy values', async () => {
+    const ghosttyProcs = {
+      ...STANDARD_PROCS,
+      '96': { ppid: '1', comm: 'Ghostty', tty: '??' },
+    };
+    // policy='fire' → unsupported-terminal-fired
+    const execFire = chainStub(ghosttyProcs, 'com.mitchellh.ghostty', undefined, 5);
+    const resultFire = await decideGate(
+      cfg({ unsupportedTerminalPolicy: 'fire', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: execFire, platform: 'darwin' },
+    );
+    expect(resultFire.reason).toBe('unsupported-terminal-fired');
+
+    // Same kind/ppid/mode — different policy. Must NOT hit the cache.
+    const execGate = chainStub(ghosttyProcs, 'com.mitchellh.ghostty', undefined, 5);
+    const resultGate = await decideGate(
+      cfg({ unsupportedTerminalPolicy: 'gate', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: execGate, platform: 'darwin' },
+    );
+    expect(resultGate.reason).toBe('unsupported-terminal-gated');
+    // Confirm the two results differ — a stale cache hit would return the first result
+    expect(resultGate.reason).not.toBe(resultFire.reason);
+  });
+
+  // FIX 5 — strict-terminal mode fires when AI terminal frontmost AND OS idle >= threshold
+  it('strict-terminal mode fires when AI terminal frontmost AND OS idle >= threshold (frontmost-different-tab)', async () => {
+    // chain: hookPpid=99, AI is claude under iTerm2, frontmost=iTerm2, idle=120 (above threshold 60)
+    const exec = chainStub(STANDARD_PROCS, 'com.googlecode.iterm2', undefined, 120);
+    const result = await decideGate(
+      cfg({ mode: 'strict-terminal', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec, platform: 'darwin' },
+    );
+    expect(result.fire).toBe(true);
+    expect(result.reason).toBe('frontmost-different-tab');
+  });
+
+  // FIX 6 — cache key isolates results across different modes (same kind+ppid)
+  it('cache key isolates results across different modes (same kind+ppid)', async () => {
+    // First call: strict-os-idle fires (idle=90 >= threshold=60)
+    const execOsIdle = vi.fn(chainStub({}, undefined, undefined, 90));
+    const resultOsIdle = await decideGate(
+      cfg({ mode: 'strict-os-idle', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: execOsIdle, platform: 'darwin' },
+    );
+    expect(resultOsIdle.fire).toBe(true);
+    expect(resultOsIdle.reason).toBe('os-idle-elapsed');
+    const callsAfterOsIdle = execOsIdle.mock.calls.length;
+
+    // Second call: fire-elsewhere mode — must NOT hit the strict-os-idle cache entry.
+    // Uses a fresh exec spy so we can verify it was actually called.
+    const execFireElsewhere = vi.fn(chainStub(STANDARD_PROCS, 'com.google.Chrome', undefined, 90));
+    const resultFireElsewhere = await decideGate(
+      cfg({ mode: 'fire-elsewhere', thresholdSeconds: 60 }),
+      'TURN_DONE',
+      HOOK_PPID,
+      { exec: execFireElsewhere, platform: 'darwin' },
+    );
+    // fire-elsewhere with Chrome frontmost → frontmost-other-app (different from os-idle-elapsed)
+    expect(resultFireElsewhere.reason).toBe('frontmost-other-app');
+    expect(execFireElsewhere.mock.calls.length).toBeGreaterThan(0); // fresh exec calls made
+    // Original exec should not have been called again
+    expect(execOsIdle.mock.calls.length).toBe(callsAfterOsIdle);
+  });
+
+  // FIX 6 — cache key isolates results across different hookPpids (same kind+mode)
+  it('cache key isolates results across different hookPpids (same kind+mode)', async () => {
+    // hookPpid=100 — process table rooted at pid 100
+    const procs100: Record<string, { ppid: string; comm: string; tty: string }> = {
+      '100': { ppid: '99', comm: 'bash', tty: 'ttys010' },
+      '99': { ppid: '98', comm: 'claude', tty: 'ttys010' },
+      '98': { ppid: '1', comm: 'iTerm2', tty: '??' },
+    };
+    const exec100 = vi.fn(chainStub(procs100, 'com.google.Chrome', undefined, 5));
+    await decideGate(cfg(), 'TURN_DONE', 100, { exec: exec100, platform: 'darwin' });
+    const callsAfter100 = exec100.mock.calls.length;
+    expect(callsAfter100).toBeGreaterThan(0);
+
+    // hookPpid=200 — different ppid, must NOT hit the ppid=100 cache entry
+    const procs200: Record<string, { ppid: string; comm: string; tty: string }> = {
+      '200': { ppid: '199', comm: 'bash', tty: 'ttys020' },
+      '199': { ppid: '198', comm: 'claude', tty: 'ttys020' },
+      '198': { ppid: '1', comm: 'iTerm2', tty: '??' },
+    };
+    const exec200 = vi.fn(chainStub(procs200, 'com.google.Chrome', undefined, 5));
+    await decideGate(cfg(), 'TURN_DONE', 200, { exec: exec200, platform: 'darwin' });
+    // exec200 must have been called — confirms a fresh evaluation happened
+    expect(exec200.mock.calls.length).toBeGreaterThan(0);
+    // exec100 must not have been called again — its cache entry was not poisoned
+    expect(exec100.mock.calls.length).toBe(callsAfter100);
   });
 });

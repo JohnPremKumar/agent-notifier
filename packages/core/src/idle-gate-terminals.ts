@@ -80,6 +80,19 @@ export function isTerminalComm(comm: string): boolean {
   return TERMINAL_COMMS_POSIX.has(comm);
 }
 
+/**
+ * Platform-dispatched check: is the frontmost application a known terminal emulator?
+ *
+ * darwin: compares against bundle IDs (e.g. "com.googlecode.iterm2")
+ * win32:  compares against process names with .exe suffix (e.g. "WindowsTerminal.exe")
+ * other:  returns false — no known frontmost representation to compare against
+ */
+export function isTerminalFrontmost(value: string, platform: NodeJS.Platform): boolean {
+  if (platform === 'darwin') return isTerminalBundle(value);
+  if (platform === 'win32') return isTerminalProcess(value);
+  return false;
+}
+
 const TAB_LOOKUP_DARWIN: Readonly<Record<string, TabLookup>> = {
   'com.apple.Terminal': async (exec) => {
     const { stdout } = await exec(
