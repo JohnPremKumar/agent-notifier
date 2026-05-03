@@ -7,7 +7,7 @@ import {
   evaluateSuppression,
   fireNotification,
   getIdleSeconds,
-  Logger,
+  loggerFromConfig,
   resolveProjectKey,
   projectDisplayName,
   type Event,
@@ -66,7 +66,7 @@ export async function runHook(toolFlag: string): Promise<void> {
   event.project = projectDisplayName(projectKey);
 
   const decision = evaluateSuppression(config, new Date(), event, idle, projectKey);
-  const logger = new Logger({ dir: logDir(), maxBytes: 1_000_000, generations: 3 });
+  const logger = loggerFromConfig(config, logDir());
   logger.append({
     ts: new Date().toISOString(),
     tool: event.tool,

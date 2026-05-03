@@ -2,10 +2,11 @@ import { existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import kleur from 'kleur';
 import {
+  ConfigStore,
   configDir,
   configFilePath,
   fireNotification,
-  Logger,
+  loggerFromConfig,
   logDir,
   type Event,
 } from '@agent-notifier/core';
@@ -70,7 +71,11 @@ export async function runDoctor(): Promise<void> {
     else await fireNotification(e);
   }
 
-  const log = new Logger({ dir: logDir(), maxBytes: 1_000_000, generations: 3 });
+  const cfg = new ConfigStore(
+    configFilePath(),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ).load();
+  const log = loggerFromConfig(cfg, logDir());
   const tail = log.readTail(5);
   if (tail.length > 0) {
     console.log('\nrecent log:');

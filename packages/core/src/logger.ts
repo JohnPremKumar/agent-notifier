@@ -8,6 +8,7 @@ import {
   unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import type { Config } from './types.js';
 
 export interface LogEntry {
   ts: string;
@@ -28,10 +29,15 @@ export interface LoggerOptions {
 }
 
 export class Logger {
+  public readonly maxBytes: number;
+  public readonly generations: number;
   private readonly file: string;
-  constructor(private readonly opts: LoggerOptions) {
+
+  constructor(opts: LoggerOptions) {
     if (!existsSync(opts.dir)) mkdirSync(opts.dir, { recursive: true });
     this.file = join(opts.dir, 'notifier.log');
+    this.maxBytes = opts.maxBytes;
+    this.generations = opts.generations;
   }
 
   append(entry: LogEntry): void {
@@ -47,13 +53,13 @@ export class Logger {
     } catch {
       return;
     }
-    if (currentSize + incomingBytes <= this.opts.maxBytes) return;
+    if (currentSize + incomingBytes <= this.maxBytes) return;
 
-    for (let i = this.opts.generations - 1; i >= 1; i--) {
+    for (let i = this.generations - 1; i >= 1; i--) {
       const src = i === 1 ? this.file : `${this.file}.${i - 1}`;
       const dst = `${this.file}.${i}`;
       if (!existsSync(src)) continue;
-      if (i === this.opts.generations - 1 && existsSync(dst)) unlinkSync(dst);
+      if (i === this.generations - 1 && existsSync(dst)) unlinkSync(dst);
       if (existsSync(dst)) unlinkSync(dst);
       renameSync(src, dst);
     }
@@ -78,4 +84,12 @@ export class Logger {
     const all = this.readAll();
     return all.slice(Math.max(0, all.length - n));
   }
+}
+
+export function loggerFromConfig(config: Config, dir: string): Logger {
+  return new Logger({
+    dir,
+    maxBytes: config.logging.maxBytes,
+    generations: config.logging.generations,
+  });
 }

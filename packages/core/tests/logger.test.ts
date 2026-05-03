@@ -3,7 +3,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, statSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Logger, type LogEntry } from '../src/logger.js';
+import { Logger, loggerFromConfig, type LogEntry } from '../src/logger.js';
+import { defaultConfig } from '../src/config.js';
 
 describe('Logger', () => {
   let dir: string;
@@ -112,5 +113,21 @@ describe('Logger', () => {
     const log = new Logger({ dir, maxBytes: 100_000, generations: 3 });
     const all = log.readAll();
     expect(all).toHaveLength(2);
+  });
+});
+
+describe('loggerFromConfig', () => {
+  it('returns a Logger configured from Config.logging', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'an-log-'));
+    try {
+      const cfg = defaultConfig('UTC');
+      cfg.logging.maxBytes = 2048;
+      cfg.logging.generations = 5;
+      const log = loggerFromConfig(cfg, dir);
+      expect(log.maxBytes).toBe(2048);
+      expect(log.generations).toBe(5);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

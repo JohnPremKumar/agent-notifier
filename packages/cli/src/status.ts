@@ -7,7 +7,7 @@ import {
   configFilePath,
   configDir,
   getIdleSeconds,
-  Logger,
+  loggerFromConfig,
   logDir,
   resolveProjectKey,
 } from '@agent-notifier/core';
@@ -63,7 +63,7 @@ export async function runStatus(): Promise<void> {
   const idle = await getIdleSeconds();
   console.log(`Idle gate:     ON (last activity ${idle === Infinity ? '?' : `${idle}s ago`})`);
 
-  const log = new Logger({ dir: logDir(), maxBytes: 1_000_000, generations: 3 });
+  const log = loggerFromConfig(c, logDir());
   const tail = log.readTail(5);
   if (tail.length > 0) {
     console.log('\nRecent (last 5):');
