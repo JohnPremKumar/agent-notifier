@@ -49,16 +49,16 @@ export const ConfigSchema = z
   .object({
     version: z.literal(2),
     tz: z.string().min(1),
-    global: z.object({ enabled: z.boolean() }).default({ enabled: true }),
-    mute: z.object({ until: z.string().datetime() }).nullable().default(null),
+    global: z.object({ enabled: z.boolean() }).strict().default({ enabled: true }),
+    mute: z.object({ until: z.string().datetime() }).strict().nullable().default(null),
     schedules: z.array(ScheduleRuleSchema).default([]),
-    tools: z.record(ToolNameSchema, z.object({ enabled: z.boolean() })).default({
+    tools: z.record(ToolNameSchema, z.object({ enabled: z.boolean() }).strict()).default({
       'claude-code': { enabled: true },
       codex: { enabled: true },
       gemini: { enabled: true },
       opencode: { enabled: true },
     }),
-    projectDefault: z.object({ enabled: z.boolean() }).default({ enabled: true }),
+    projectDefault: z.object({ enabled: z.boolean() }).strict().default({ enabled: true }),
     projects: z.record(z.string(), ProjectEntrySchema).default({}),
 
     idleGate: z
@@ -67,13 +67,16 @@ export const ConfigSchema = z
         thresholdSeconds: z.number().int().min(0).max(3600).default(60),
         unsupportedTerminalPolicy: UnsupportedTerminalPolicySchema.default('fire'),
       })
+      .strict()
       .default({}),
 
+    // sound and icon: extension/path validation added in Task 13 (zod refinements at config save).
     sound: z
       .object({
         darwin: z.string().min(1).default('Ping'),
         win32: z.string().min(1).default('ms-winsoundevent:Notification.Default'),
       })
+      .strict()
       .default({}),
 
     icon: z
@@ -81,6 +84,7 @@ export const ConfigSchema = z
         darwin: z.string().min(1).nullable().default(null),
         win32: z.string().min(1).nullable().default(null),
       })
+      .strict()
       .default({}),
 
     logging: z
@@ -88,6 +92,7 @@ export const ConfigSchema = z
         maxBytes: z.number().int().min(1024).max(100_000_000).default(1_000_000),
         generations: z.number().int().min(1).max(20).default(3),
       })
+      .strict()
       .default({}),
   })
   .strict();

@@ -54,4 +54,48 @@ describe('ConfigSchema v2', () => {
   it('rejects v1 directly (migration handles upgrade)', () => {
     expect(() => ConfigSchema.parse({ version: 1, tz: 'UTC' })).toThrow();
   });
+
+  it('round-trips a fully populated v2 config', () => {
+    const populated = {
+      version: 2,
+      tz: 'America/New_York',
+      global: { enabled: true },
+      mute: { until: '2026-12-31T23:59:59.000Z' },
+      schedules: [{
+        id: 'work',
+        type: 'allow' as const,
+        days: ['mon' as const, 'tue' as const, 'wed' as const, 'thu' as const, 'fri' as const],
+        from: '09:00',
+        to: '18:00',
+      }],
+      tools: {
+        'claude-code': { enabled: true },
+        codex: { enabled: false },
+        gemini: { enabled: true },
+        opencode: { enabled: true },
+      },
+      projectDefault: { enabled: false },
+      projects: { '/Users/me/work/foo': { enabled: true, kinds: ['PERMISSION' as const] } },
+      idleGate: {
+        mode: 'strict-terminal' as const,
+        thresholdSeconds: 30,
+        unsupportedTerminalPolicy: 'gate' as const,
+      },
+      sound: { darwin: 'Glass', win32: 'ms-winsoundevent:Notification.IM' },
+      icon: { darwin: '/Users/me/icons/agent.png', win32: 'C:\\\\icons\\\\agent.ico' },
+      logging: { maxBytes: 2_000_000, generations: 5 },
+    };
+    const c = ConfigSchema.parse(populated);
+    expect(c).toEqual(populated);
+  });
+
+  it('rejects unknown nested fields under strict zod', () => {
+    expect(() =>
+      ConfigSchema.parse({
+        version: 2,
+        tz: 'UTC',
+        idleGate: { thrshold: 60 } as unknown as Record<string, unknown>,
+      }),
+    ).toThrow();
+  });
 });
