@@ -1,0 +1,10 @@
+name: New adapter request
+description: Request support for another AI coding CLI.
+labels: [adapter]
+body:
+  - type: input
+    attributes: { label: "Tool name + repo" }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: "Hook surface", description: "Link to the tool's hook/event docs. Sample payloads if available." }
+    validations: { required: true }

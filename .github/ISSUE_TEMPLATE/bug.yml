@@ -1,0 +1,13 @@
+name: Bug report
+description: Something is wrong with agent-notifier.
+labels: [bug]
+body:
+  - type: textarea
+    attributes: { label: "What happened?", description: "Including expected vs actual." }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: "agent-notifier doctor output", description: "Paste the full output (it sanitizes paths)." }
+    validations: { required: true }
+  - type: input
+    attributes: { label: "OS + Node version" }
+    validations: { required: true }
