@@ -18,6 +18,10 @@ export interface LogEntry {
   sessionId: string;
   fired: boolean;
   suppressReason?: string;
+  /** Gate mode in effect when the notification decision was made (Phase H observability). */
+  gateMode?: string;
+  /** Decision reason from decideGate (Phase H observability). */
+  gateDecision?: string;
   msg?: string;
   error?: string;
 }

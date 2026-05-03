@@ -1,27 +1,26 @@
 import type { Config, Event } from './types.js';
 import { evaluateSchedule } from './schedule.js';
+import { decideGate, type GateDecision, type GetIdleOptions } from './idle-gate.js';
 
 export interface SuppressDecision {
   fire: boolean;
   reason?: string;
+  gateMode?: Config['idleGate']['mode'];
+  gateDecision?: GateDecision;
 }
 
 export interface SuppressOptions {
-  idleThreshold?: number; // seconds
+  gateOpts?: GetIdleOptions;
 }
 
-const DEFAULT_IDLE_THRESHOLD = 30;
-
-export function evaluateSuppression(
+export async function evaluateSuppression(
   config: Config,
   now: Date,
   event: Event,
-  idleSeconds: number,
   projectKey: string,
+  hookPpid: number,
   opts: SuppressOptions = {},
-): SuppressDecision {
-  const idleThreshold = opts.idleThreshold ?? DEFAULT_IDLE_THRESHOLD;
-
+): Promise<SuppressDecision> {
   if (!config.global.enabled) return { fire: false, reason: 'global-disabled' };
 
   if (config.mute && new Date(config.mute.until).getTime() > now.getTime()) {
@@ -44,9 +43,11 @@ export function evaluateSuppression(
     return { fire: false, reason: 'project-default-disabled' };
   }
 
-  if (event.kind !== 'PERMISSION' && idleSeconds < idleThreshold) {
-    return { fire: false, reason: 'user-active' };
-  }
-
-  return { fire: true };
+  const gate = await decideGate(config, event.kind, hookPpid, opts.gateOpts);
+  return {
+    fire: gate.fire,
+    ...(gate.fire ? {} : { reason: `gate:${gate.reason}` }),
+    gateMode: config.idleGate.mode,
+    gateDecision: gate.reason,
+  };
 }

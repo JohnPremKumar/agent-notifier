@@ -6,7 +6,6 @@ import {
   logDir,
   evaluateSuppression,
   fireNotification,
-  getIdleSeconds,
   loggerFromConfig,
   resolveProjectKey,
   projectDisplayName,
@@ -51,12 +50,10 @@ export async function runHook(toolFlag: string): Promise<void> {
   const tz = tzGuess();
   const store = new ConfigStore(configFilePath(), tz);
   const config = store.load();
-  const idleEnv = process.env['AGENT_NOTIFIER_IDLE_SECONDS'];
-  const idle = idleEnv !== undefined ? Number(idleEnv) : await getIdleSeconds();
   const projectKey = resolveProjectKey(event.cwd);
   event.project = projectDisplayName(projectKey);
 
-  const decision = evaluateSuppression(config, new Date(), event, idle, projectKey);
+  const decision = await evaluateSuppression(config, new Date(), event, projectKey, process.ppid);
   const logger = loggerFromConfig(config, logDir());
   logger.append({
     ts: new Date().toISOString(),
@@ -66,6 +63,8 @@ export async function runHook(toolFlag: string): Promise<void> {
     sessionId: event.sessionId,
     fired: decision.fire,
     ...(decision.reason !== undefined && { suppressReason: decision.reason }),
+    ...(decision.gateMode !== undefined && { gateMode: decision.gateMode }),
+    ...(decision.gateDecision !== undefined && { gateDecision: decision.gateDecision }),
     ...(event.message !== undefined && { msg: event.message }),
   });
 
