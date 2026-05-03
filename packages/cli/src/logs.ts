@@ -1,6 +1,8 @@
 import kleur from 'kleur';
 import {
-  Logger,
+  ConfigStore,
+  configFilePath,
+  loggerFromConfig,
   logDir,
   resolveProjectKey,
   KindSchema,
@@ -61,7 +63,9 @@ function matches(entry: LogEntry, opts: LogsOpts, projectKey?: string): boolean 
 }
 
 export function runLogs(opts: LogsOpts): void {
-  const log = new Logger({ dir: logDir(), maxBytes: 1_000_000, generations: 3 });
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const cfg = new ConfigStore(configFilePath(), tz).load();
+  const log = loggerFromConfig(cfg, logDir());
   const projectKey =
     opts.project === true
       ? resolveProjectKey(process.cwd())
