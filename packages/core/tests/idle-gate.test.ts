@@ -13,6 +13,7 @@ import {
   walkUpToTerminal,
   getProcessComm,
   getProcessPpid,
+  getFrontmostBundle,
   type ExecFn,
 } from '../src/idle-gate.js';
 
@@ -61,19 +62,18 @@ describe('getIdleSeconds (with stubbed exec)', () => {
   });
 });
 
-const psStub = (
-  table: Record<string, { ppid: string; comm: string; tty: string }>,
-): ExecFn =>
-  async (cmd) => {
+const psStub =
+  (table: Record<string, { ppid: string; comm: string; tty: string }>): ExecFn =>
+  (cmd) => {
     const m = cmd.match(/-p (\d+)/);
-    if (!m) return { stdout: '', stderr: '' };
+    if (!m) return Promise.resolve({ stdout: '', stderr: '' });
     const pid = m[1]!;
     const row = table[pid];
-    if (!row) return { stdout: '', stderr: '' };
-    if (cmd.includes('ppid='))      return { stdout: row.ppid + '\n', stderr: '' };
-    if (cmd.includes('comm='))      return { stdout: row.comm + '\n', stderr: '' };
-    if (cmd.includes('tty='))       return { stdout: row.tty + '\n', stderr: '' };
-    return { stdout: '', stderr: '' };
+    if (!row) return Promise.resolve({ stdout: '', stderr: '' });
+    if (cmd.includes('ppid=')) return Promise.resolve({ stdout: row.ppid + '\n', stderr: '' });
+    if (cmd.includes('comm=')) return Promise.resolve({ stdout: row.comm + '\n', stderr: '' });
+    if (cmd.includes('tty=')) return Promise.resolve({ stdout: row.tty + '\n', stderr: '' });
+    return Promise.resolve({ stdout: '', stderr: '' });
   };
 
 describe('process tree walk', () => {
@@ -81,9 +81,9 @@ describe('process tree walk', () => {
     // tree: hook(100) ← bash(99) ← claude(98) ← Terminal(97)
     const exec = psStub({
       '100': { ppid: '99', comm: 'agent-notifier', tty: 'ttys003' },
-      '99':  { ppid: '98', comm: 'bash',           tty: 'ttys003' },
-      '98':  { ppid: '97', comm: 'claude',         tty: 'ttys003' },
-      '97':  { ppid: '1',  comm: 'Terminal',       tty: '??' },
+      '99': { ppid: '98', comm: 'bash', tty: 'ttys003' },
+      '98': { ppid: '97', comm: 'claude', tty: 'ttys003' },
+      '97': { ppid: '1', comm: 'Terminal', tty: '??' },
     });
     const aiPid = await resolveAiPid(99, { exec, platform: 'darwin' });
     expect(aiPid).toBe(98);
@@ -92,8 +92,8 @@ describe('process tree walk', () => {
   it('handles direct invocation (hookPpid IS the AI tool)', async () => {
     const exec = psStub({
       '50': { ppid: '49', comm: 'agent-notifier', tty: 'ttys004' },
-      '49': { ppid: '48', comm: 'claude',         tty: 'ttys004' },
-      '48': { ppid: '1',  comm: 'iTerm2',         tty: '??' },
+      '49': { ppid: '48', comm: 'claude', tty: 'ttys004' },
+      '48': { ppid: '1', comm: 'iTerm2', tty: '??' },
     });
     const aiPid = await resolveAiPid(49, { exec, platform: 'darwin' });
     expect(aiPid).toBe(49);
@@ -117,9 +117,9 @@ describe('process tree walk', () => {
 
   it('walkUpToTerminal finds the terminal app (skipping intermediate processes)', async () => {
     const exec = psStub({
-      '98': { ppid: '97', comm: 'claude',  tty: 'ttys005' },
-      '97': { ppid: '96', comm: 'login',   tty: 'ttys005' },
-      '96': { ppid: '1',  comm: 'iTerm2',  tty: '??' },
+      '98': { ppid: '97', comm: 'claude', tty: 'ttys005' },
+      '97': { ppid: '96', comm: 'login', tty: 'ttys005' },
+      '96': { ppid: '1', comm: 'iTerm2', tty: '??' },
     });
     const term = await walkUpToTerminal(98, { exec, platform: 'darwin' });
     expect(term).toBe('iTerm2');
@@ -143,13 +143,13 @@ describe('process tree walk', () => {
   });
 
   it('getProcessComm strips path prefix on darwin/linux', async () => {
-    const exec: ExecFn = async () => ({ stdout: '/usr/local/bin/claude\n', stderr: '' });
+    const exec: ExecFn = () => Promise.resolve({ stdout: '/usr/local/bin/claude\n', stderr: '' });
     const comm = await getProcessComm(99, { exec, platform: 'darwin' });
     expect(comm).toBe('/usr/local/bin/claude');
   });
 
   it('getProcessPpid returns null on parse failure', async () => {
-    const exec: ExecFn = async () => ({ stdout: 'NotANumber\n', stderr: '' });
+    const exec: ExecFn = () => Promise.resolve({ stdout: 'NotANumber\n', stderr: '' });
     const ppid = await getProcessPpid(50, { exec, platform: 'darwin' });
     expect(ppid).toBeNull();
   });
@@ -157,11 +157,62 @@ describe('process tree walk', () => {
   it('treats hookPpid being a shell as a hint to keep walking', async () => {
     // First level IS bash; that's expected from a wrapper command.
     const exec = psStub({
-      '101': { ppid: '99', comm: 'bash',           tty: 'ttys003' },
-      '99':  { ppid: '98', comm: 'codex',          tty: 'ttys003' },
-      '98':  { ppid: '1',  comm: 'iTerm2',         tty: '??' },
+      '101': { ppid: '99', comm: 'bash', tty: 'ttys003' },
+      '99': { ppid: '98', comm: 'codex', tty: 'ttys003' },
+      '98': { ppid: '1', comm: 'iTerm2', tty: '??' },
     });
     const aiPid = await resolveAiPid(101, { exec, platform: 'darwin' });
     expect(aiPid).toBe(99);
+  });
+});
+
+describe('getFrontmostBundle', () => {
+  it('parses macOS osascript output (bundle id)', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: 'com.googlecode.iterm2\n', stderr: '' });
+    const r = await getFrontmostBundle({ exec, platform: 'darwin' });
+    expect(r).toBe('com.googlecode.iterm2');
+  });
+
+  it('returns null on osascript timeout/error (fail-open)', async () => {
+    const exec = vi.fn().mockRejectedValue(new Error('timeout'));
+    const r = await getFrontmostBundle({ exec, platform: 'darwin' });
+    expect(r).toBeNull();
+  });
+
+  it('parses Windows process name from PowerShell output', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: 'WindowsTerminal\n', stderr: '' });
+    const r = await getFrontmostBundle({ exec, platform: 'win32' });
+    expect(r).toBe('WindowsTerminal.exe');
+  });
+
+  it('darwin: empty stdout returns null (not empty string)', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '   \n', stderr: '' });
+    const r = await getFrontmostBundle({ exec, platform: 'darwin' });
+    expect(r).toBeNull();
+  });
+
+  it('win32: empty stdout returns null (not ".exe")', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
+    const r = await getFrontmostBundle({ exec, platform: 'win32' });
+    expect(r).toBeNull();
+  });
+
+  it('non-darwin/non-win32 platform returns null without calling exec', async () => {
+    const exec = vi.fn();
+    const r = await getFrontmostBundle({ exec, platform: 'linux' as NodeJS.Platform });
+    expect(r).toBeNull();
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  it('timeout option propagates to exec call', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: 'com.apple.Terminal\n', stderr: '' });
+    await getFrontmostBundle({ exec, platform: 'darwin', timeoutMs: 500 });
+    expect(exec.mock.calls[0]?.[1]).toEqual({ timeout: 500 });
+  });
+
+  it('uses default 200ms timeout when timeoutMs is not specified', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: 'com.apple.Terminal\n', stderr: '' });
+    await getFrontmostBundle({ exec, platform: 'darwin' });
+    expect(exec.mock.calls[0]?.[1]).toEqual({ timeout: 200 });
   });
 });

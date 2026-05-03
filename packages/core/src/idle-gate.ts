@@ -93,7 +93,10 @@ export async function getProcessComm(pid: number, opts: GetIdleOptions = {}): Pr
   }
 }
 
-export async function getProcessPpid(pid: number, opts: GetIdleOptions = {}): Promise<number | null> {
+export async function getProcessPpid(
+  pid: number,
+  opts: GetIdleOptions = {},
+): Promise<number | null> {
   const exec = opts.exec ?? execAsync;
   try {
     const { stdout } = await exec(`ps -o ppid= -p ${pid}`, { timeout: opts.timeoutMs ?? 200 });
@@ -104,7 +107,10 @@ export async function getProcessPpid(pid: number, opts: GetIdleOptions = {}): Pr
   }
 }
 
-export async function getProcessTty(pid: number, opts: GetIdleOptions = {}): Promise<string | null> {
+export async function getProcessTty(
+  pid: number,
+  opts: GetIdleOptions = {},
+): Promise<string | null> {
   const exec = opts.exec ?? execAsync;
   try {
     const { stdout } = await exec(`ps -o tty= -p ${pid}`, { timeout: opts.timeoutMs ?? 200 });
@@ -162,4 +168,43 @@ export async function walkUpToTerminal(
     pid = await getProcessPpid(pid, opts);
   }
   return null;
+}
+
+const MAC_FRONTMOST_CMD = `osascript -e 'tell application "System Events" to get bundle identifier of first application process whose frontmost is true'`;
+const WIN_FRONTMOST_CMD =
+  'powershell -NoProfile -Command "' +
+  "Add-Type 'using System; using System.Runtime.InteropServices; " +
+  'public class W { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); ' +
+  '[DllImport(\\"user32.dll\\")] public static extern int GetWindowThreadProcessId(IntPtr h, out int p); }\';' +
+  '$h = [W]::GetForegroundWindow(); $p = 0; [W]::GetWindowThreadProcessId($h, [ref]$p) | Out-Null; ' +
+  '(Get-Process -Id $p).ProcessName"';
+
+/**
+ * Return the bundle identifier (macOS) or process name with ".exe" suffix (Windows) of the
+ * currently frontmost application. Returns null on unsupported platforms or when the OS-level
+ * query fails.
+ *
+ * darwin:  uses osascript + System Events; returns e.g. "com.googlecode.iterm2"
+ * win32:   uses PowerShell + GetForegroundWindow; returns e.g. "WindowsTerminal.exe"
+ *          (the ".exe" suffix makes the value directly comparable to TERMINAL_PROCESSES_WIN32)
+ */
+export async function getFrontmostBundle(opts: GetIdleOptions = {}): Promise<string | null> {
+  const exec = opts.exec ?? execAsync;
+  const platform = opts.platform ?? process.platform;
+  const timeout = opts.timeoutMs ?? 200;
+  try {
+    if (platform === 'darwin') {
+      const { stdout } = await exec(MAC_FRONTMOST_CMD, { timeout });
+      const v = stdout.trim();
+      return v || null;
+    }
+    if (platform === 'win32') {
+      const { stdout } = await exec(WIN_FRONTMOST_CMD, { timeout });
+      const v = stdout.trim();
+      return v ? `${v}.exe` : null;
+    }
+    return null;
+  } catch {
+    return null; // fail-open: treat frontmost as unknown so we don't swallow notifications
+  }
 }
