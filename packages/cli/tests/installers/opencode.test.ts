@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { createOpenCodeInstaller } from '../../src/lib/installers/opencode.js';
 
 describe('opencode installer', () => {
-  let home: string; let pluginDir: string;
+  let home: string;
+  let pluginDir: string;
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'agentoc-'));
     pluginDir = join(home, '.config', 'opencode', 'plugins');
@@ -19,7 +20,7 @@ describe('opencode installer', () => {
     await inst().install();
     const file = join(pluginDir, 'agent-notifier.js');
     expect(existsSync(file)).toBe(true);
-    expect(readFileSync(file, 'utf8')).toContain("agent-notifier");
+    expect(readFileSync(file, 'utf8')).toContain('agent-notifier');
   });
 
   it('install is idempotent (overwrites with same content)', async () => {

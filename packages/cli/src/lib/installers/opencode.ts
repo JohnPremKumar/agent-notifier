@@ -11,14 +11,20 @@ export function createOpenCodeInstaller(opts: { home?: string } = {}) {
 
   return {
     name,
-    async detect(): Promise<boolean> { return existsSync(dir); },
-    async isWired(): Promise<boolean> { return existsSync(file); },
-    async install(): Promise<void> {
+    detect(): Promise<boolean> {
+      return Promise.resolve(existsSync(dir));
+    },
+    isWired(): Promise<boolean> {
+      return Promise.resolve(existsSync(file));
+    },
+    install(): Promise<void> {
       mkdirSync(dir, { recursive: true });
       writeFileSync(file, OPENCODE_PLUGIN_SOURCE, 'utf8');
+      return Promise.resolve();
     },
-    async uninstall(): Promise<void> {
+    uninstall(): Promise<void> {
       if (existsSync(file)) unlinkSync(file);
+      return Promise.resolve();
     },
   };
 }

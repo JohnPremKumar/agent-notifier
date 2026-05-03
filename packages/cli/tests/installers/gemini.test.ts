@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { createGeminiInstaller } from '../../src/lib/installers/gemini.js';
 
 describe('gemini installer', () => {
-  let home: string; let path: string;
+  let home: string;
+  let path: string;
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'agentgem-'));
     mkdirSync(join(home, '.gemini'));

@@ -1,5 +1,13 @@
 import TOML from '@iarna/toml';
-import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+  mkdirSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import type { ToolName } from '@agent-notifier/core';
@@ -7,7 +15,9 @@ import type { ToolName } from '@agent-notifier/core';
 const MARK = 'agent-notifier hook --tool codex';
 const EVENTS = ['PermissionRequest', 'Stop'] as const;
 
-interface HookCmd { command: string; }
+interface HookCmd {
+  command: string;
+}
 type CodexConfig = { hooks?: Record<string, HookCmd[]>; [k: string]: unknown };
 
 export function createCodexInstaller(opts: { home?: string } = {}) {
@@ -23,44 +33,50 @@ export function createCodexInstaller(opts: { home?: string } = {}) {
 
   return {
     name,
-    async detect(): Promise<boolean> { return existsSync(join(home, '.codex')); },
-
-    async isWired(): Promise<boolean> {
-      const c = read();
-      const hooks = c.hooks ?? {};
-      return EVENTS.every((e) => (hooks[e] ?? []).some((h) => h.command.includes(MARK)));
+    detect(): Promise<boolean> {
+      return Promise.resolve(existsSync(join(home, '.codex')));
     },
 
-    async install(): Promise<void> {
+    isWired(): Promise<boolean> {
+      const c = read();
+      const hooks = c.hooks ?? {};
+      return Promise.resolve(
+        EVENTS.every((e) => (hooks[e] ?? []).some((h) => h.command.includes(MARK))),
+      );
+    },
+
+    install(): Promise<void> {
       mkdirSync(dirname(file), { recursive: true });
       if (existsSync(file) && !existsSync(bak)) copyFileSync(file, bak);
       const c = read();
       c.hooks = c.hooks ?? {};
       for (const e of EVENTS) {
         c.hooks[e] = c.hooks[e] ?? [];
-        if (!c.hooks[e]!.some((h) => h.command.includes(MARK))) {
-          c.hooks[e]!.push({ command: MARK });
+        if (!c.hooks[e].some((h) => h.command.includes(MARK))) {
+          c.hooks[e].push({ command: MARK });
         }
       }
       const tmp = `${file}.tmp`;
       writeFileSync(tmp, TOML.stringify(c as TOML.JsonMap), 'utf8');
       renameSync(tmp, file);
+      return Promise.resolve();
     },
 
-    async uninstall(): Promise<void> {
+    uninstall(): Promise<void> {
       if (existsSync(bak)) {
         copyFileSync(bak, file);
         unlinkSync(bak);
-        return;
+        return Promise.resolve();
       }
       const c = read();
       const hooks = c.hooks ?? {};
       for (const e of EVENTS) {
         hooks[e] = (hooks[e] ?? []).filter((h) => !h.command.includes(MARK));
-        if (hooks[e]!.length === 0) delete hooks[e];
+        if (hooks[e].length === 0) delete hooks[e];
       }
       c.hooks = hooks;
       writeFileSync(file, TOML.stringify(c as TOML.JsonMap), 'utf8');
+      return Promise.resolve();
     },
   };
 }

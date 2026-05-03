@@ -33,7 +33,10 @@ describe('claude-code installer', () => {
   });
 
   it('install merges into existing settings.json without losing user keys', async () => {
-    writeFileSync(settingsPath, JSON.stringify({ model: 'claude-opus-4-7', hooks: { PreToolUse: [] } }, null, 2));
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ model: 'claude-opus-4-7', hooks: { PreToolUse: [] } }, null, 2),
+    );
     await inst().install();
     const s = JSON.parse(readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
     expect(s['model']).toBe('claude-opus-4-7');
