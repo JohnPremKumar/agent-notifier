@@ -77,6 +77,9 @@ agent-notifier — set up
     We'll back up each config to <file>.agent-notifier.bak before editing.
 
   › Send a test notification now? (Yes)
+    Heads up: macOS may ask permission for agent-notifier to detect which app you're
+    focused on — say allow. That's what makes notifications fire only when you're
+    not looking at the agent's terminal.
     🔊 — "Agent is done · agent-notifier · test"
 
   ✓ Done. You'll get a ping when:
@@ -234,8 +237,12 @@ Storage: central, in `~/.agent-notifier/config.json`. Project key resolution use
 Hook fires → classify → produce Event
   if kind == PERMISSION → FIRE (always; agent is blocked)
   else:
-    AI's TTY      = ps -o tty= -p $PPID                                    (e.g. ttys003)
-    AI's terminal = walk PPID chain via ps until comm matches a terminal   (e.g. com.googlecode.iterm2)
+    PID0          = process.ppid                                           (immediate parent of hook)
+    AI PID        = walk up while comm matches a known shell               (skip bash | sh | zsh | fish | dash)
+                    until comm matches an AI tool exe (claude | codex | gemini | opencode)
+                    OR until parent's comm matches a known terminal        (then PID0 is the AI tool)
+    AI's TTY      = ps -o tty= -p <AI PID>                                 (e.g. ttys003)
+    AI's terminal = continue walking PPID chain until comm matches a terminal exe
     Frontmost     = osascript "frontmost app bundle id"
     if Frontmost ≠ AI's terminal app → FIRE                                (different app entirely)
     if Frontmost == AI's terminal app:
@@ -244,6 +251,8 @@ Hook fires → classify → produce Event
       if active tab TTY ≠ AI's TTY                   → FIRE                (sibling tab)
       if terminal doesn't expose this (Ghostty et al) → FIRE              (policy (b))
 ```
+
+**Shell-hop rationale:** Claude Code allows `command: bash -c "agent-notifier hook ..."` style hooks. In that case `process.ppid` is `bash`, not `claude`. The walk skips intermediate POSIX shells until it finds the AI tool. Bounded depth: max 8 levels of PPID walk (defense against pathological process trees / fork bombs); fail-open if exceeded.
 
 Failure modes — all → FIRE (fail-open):
 - AppleScript / PowerShell timeout (200ms)
@@ -257,7 +266,8 @@ Failure modes — all → FIRE (fail-open):
 |---|---|---|
 | Terminal.app | `com.apple.Terminal` | `tell app "Terminal" to get tty of selected tab of front window` |
 | iTerm2 | `com.googlecode.iterm2` | `tell app "iTerm2" to tty of current session of current window` |
-| VSCode / Cursor / Windsurf | `com.microsoft.VSCode`, `com.todesktop.230313mzl4w4u92`, `com.exafunction.windsurf` | Read `TTY` env var of integrated-terminal child shell from `/proc/<pid>/environ` (Linux) or via `ps -E -p <pid>` (mac) |
+| VSCode / Cursor / Windsurf — **Windows only** | `Code.exe`, `Cursor.exe`, `Windsurf.exe` | `GetForegroundWindow` + `GetWindowThreadProcessId` — Win32 cleanly identifies the focused editor window's PID, walk children to find active integrated terminal |
+| VSCode / Cursor / Windsurf — **macOS** | `com.microsoft.VSCode`, `com.todesktop.230313mzl4w4u92`, `com.exafunction.windsurf` | **Not supported on mac** — `ps E` env access is truncated/per-pid and there's no portable way to identify which VSCode window owns a given child shell. Falls through to `unsupportedTerminalPolicy` (default `'fire'`) |
 | Windows Terminal (1.16+) | `WindowsTerminal.exe` | JSON-RPC over named pipe `\\.\pipe\Terminal-<runtime-id>` for active pane (pipe name discovered via `Get-Process` matching) |
 | Ghostty | `com.mitchellh.ghostty` | Not supported → policy (b) |
 | Alacritty | `org.alacritty` | Not supported → policy (b) |
@@ -313,9 +323,11 @@ We bundle a designed agent-notifier mark and pass it explicitly to `node-notifie
 
 | Platform | File | Size | Format | Source |
 |---|---|---|---|---|
-| macOS | `assets/icon.png` | 512×512 (with 256 fallback for older systems) | PNG with alpha (system rounds the corners) | Bundled in `packages/cli/assets/` |
-| macOS (sticky / `terminal-notifier`) | `assets/icon.icns` | multi-res | ICNS | Bundled — required by `terminal-notifier`'s `--appIcon` |
-| Windows | `assets/icon.ico` | 256×256 (multi-res ICO) | ICO | Bundled |
+| macOS | `assets/icon.png` | 512×512 (with 256 fallback for older systems) | PNG with alpha (system rounds the corners) | Bundled in `packages/core/assets/` |
+| macOS (sticky / `terminal-notifier`) | `assets/icon.icns` | multi-res | ICNS | Bundled in `packages/core/assets/` — required by `terminal-notifier`'s `--appIcon` |
+| Windows | `assets/icon.ico` | 256×256 (multi-res ICO) | ICO | Bundled in `packages/core/assets/` |
+
+**Why `core` not `cli`:** `packages/core/src/notify.ts` is the chokepoint that fires every notification and resolves the bundled path. Putting assets in `cli` would force `core → cli` import (wrong direction; cli depends on core). Assets live with the code that consumes them. The cli package never references icon files directly — it only writes user-override paths into config, which core reads.
 
 **Design brief — friendly mark:**
 
@@ -344,7 +356,14 @@ const BUNDLED_ICON = {
 };
 ```
 
-`packages/core/package.json` adds `assets/` to the `files` array so it's published with the package. `tsup.config.ts` is configured to copy `assets/` into `dist/../assets/` (or assets sit alongside the package and are pathed accordingly — verified in smoke).
+**Build + publish wiring (locked, not optional):**
+
+1. `packages/core/package.json` `files` array adds `"assets"` so the directory ships in the published tarball alongside `dist`.
+2. `packages/core/tsup.config.ts` adds an `onSuccess` hook that runs `cp -r assets dist/../assets` (idempotent — `assets/` sits at the package root, sibling to `dist/`, NOT inside `dist/`). The path resolution above (`resolve(here, '../assets/...')`) walks one level up from `dist/` to find them.
+3. Smoke test step asserts the published tarball (`npm pack --dry-run`) lists `package/assets/icon.png`, `icon.icns`, and `icon.ico`. CI fails if any are missing.
+4. Source SVG checked into `packages/core/assets/source/icon.svg`. Build target sizes (PNG 256/512, ICNS multi-res, ICO 16/32/48/256) generated via a one-shot `pnpm gen:icons` script (uses `sharp` + `png2icons` as dev dependencies, NOT runtime). The script is documented but not part of the build hot path — re-run only when the SVG changes.
+
+**Tradeoff considered:** using `tsup`'s `loader: { '.png': 'copy' }` for image extensions. Rejected — only works if the assets are imported from TS code (they're not; they're path-resolved at runtime). Explicit `cp` in `onSuccess` is simpler and matches what the runtime code expects.
 
 ### 9.3 User override (custom icon)
 
@@ -542,6 +561,8 @@ Forward compat: v2 config opened by older binary → zod throws on `version: 2` 
 
 `~/.agent-notifier/log/notifications.jsonl` — already capped at 1 MB × 3 generations = 3 MB max. Cap is now configurable via `config.logging.{maxBytes,generations}`.
 
+**Centralization (locked):** `Logger` is currently instantiated with hard-coded options in three places (`status.ts`, `doctor.ts`, `hook.ts`). After this spec, all three need to read from config — easy to miss one and drift. Add a `loggerFromConfig(config)` factory in `packages/core/src/logger.ts` that returns a configured `Logger`. All callsites switch to it. No callsite constructs `new Logger({...})` directly outside the factory.
+
 New fields per entry:
 
 ```ts
@@ -556,11 +577,21 @@ New fields per entry:
 
 ### 13.2 Stub log (test/init paths)
 
-`~/.agent-notifier/stub-notifications.jsonl` is currently an unbounded `appendFileSync` at `doctor.ts:42` and `init.ts:32`. Bug. Fix: route through the same `Logger` with a 256 KB × 1 cap (no history needed for stub).
+`~/.agent-notifier/stub-notifications.jsonl` is currently an unbounded `appendFileSync` duplicated in three places (`init.ts:32`, `doctor.ts:42`, `hook.ts`). Two bugs: unbounded growth + triplicated implementation.
+
+Fix:
+- Extract `stubNotifyAppend(event)` in `packages/core/src/notify.ts` (single implementation).
+- Route through `Logger` with a 256 KB × 1 cap (no history needed for stub — overwrite when full).
+- All three callers import the helper; no local `appendFileSync` for stub paths.
 
 ### 13.3 Backup files
 
-`*.agent-notifier.bak` files are one-time per dotfile. Audit: ensure we do NOT overwrite an existing `.bak` on subsequent `install` invocations — the original `.bak` represents the user's pre-agent-notifier state, not the last edit. If a `.bak` already exists, leave it alone.
+Two backup file conventions, distinct purposes — both kept:
+
+- **`<file>.agent-notifier.bak`** — written ONCE, the first time `install` edits a tool's dotfile. Represents the user's pre-agent-notifier state. **Never overwritten** on subsequent installs. `uninstall` restores from this file. If it already exists when `install` runs, leave it alone (idempotency).
+- **`<file>.<ISO-timestamp>.bak`** — written every time `init` saves a config change after the first one. Represents intermediate states the user might want to roll back to (e.g., they re-ran `init` and want yesterday's settings). Kept indefinitely (could prune old timestamped backups in a future flag — out of scope).
+
+These are separate files for separate purposes; one is install-state, the other is config-history. The audit step: confirm `install.ts`'s backup logic in each per-tool installer respects the "write once, leave alone" rule for `.agent-notifier.bak`. The config-save backup is new code in `config.ts`.
 
 ### 13.4 `logs --prune`
 
@@ -570,7 +601,16 @@ New flag. Truncates all rotated logs (including the stub log) to 0. Manual escap
 
 ### 14.1 Unit (`packages/core/tests/`)
 
-- `idle-gate.test.ts` — parametric over (mode, frontmost, ai-terminal, ai-tty, active-tab-tty) → expected decision. Mocks `exec`. Covers every cell of the decision table including all four modes, both policies, all failure modes.
+- `idle-gate.test.ts` — parametric over (mode, frontmost, ai-terminal, ai-tty, active-tab-tty, **`unsupportedTerminalPolicy ∈ {fire, gate}`**) → expected decision. Mocks `exec`. Covers every cell of the decision table including all four modes, both policies (fire AND gate, equally — neither defaulted in the matrix), all failure modes. **Specifically required test cases:**
+  - AppleScript exits non-zero with permission-denied stderr → fail-open → `gateDecision: 'fail-open'`
+  - AppleScript times out at 200ms → fail-open
+  - `ps` returns empty for AI PID (race) → fail-open
+  - Process tree walk hits 8-level depth limit → fail-open
+  - Shell-hop: ppid is `bash`, ppid's ppid is `claude` → AI PID resolves to claude
+  - `unsupportedTerminalPolicy: 'gate'` + Ghostty frontmost + AI's TTY idle 90s → suppress (matches policy a behavior)
+  - `unsupportedTerminalPolicy: 'fire'` + Ghostty frontmost → fire regardless of TTY state (matches policy b)
+  - VSCode mac frontmost (now classified unsupported) + 'fire' policy → fire
+  - VSCode win32 frontmost + per-window PID match → suppress when active editor matches
 - `suppress.test.ts` — extend with new gate decisions; ensure PERMISSION still bypasses everything.
 - `config.test.ts` — round-trip v1 → migrate → v2 → save → load → still v2. Forward-compat: v2 with extra unknown fields is rejected (strict zod). Backward: v1 still loadable on v2 code.
 - `notify.test.ts` — PERMISSION uses `Ping` + sticky on mac; IDLE/TURN_DONE use `Ping` + non-sticky; PERMISSION uses `alarm` scenario on win. Asset resolution: built-in name passed through; absolute path passed through; non-existent custom path falls back to platform default and logs `asset-fallback` once.
