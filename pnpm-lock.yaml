@@ -53,9 +53,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@agent-notifier/core':
-        specifier: workspace:*
-        version: link:../core
       '@iarna/toml':
         specifier: ^2.2.5
         version: 2.2.5
@@ -68,12 +65,22 @@ importers:
       kleur:
         specifier: ^4.1.5
         version: 4.1.5
+      node-notifier:
+        specifier: ^10.0.1
+        version: 10.0.1
       ora:
         specifier: ^8.0.0
         version: 8.2.0
       zod:
         specifier: ^3.23.0
         version: 3.25.76
+    devDependencies:
+      '@agent-notifier/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/node-notifier':
+        specifier: ^8.0.5
+        version: 8.0.5
 
   packages/core:
     dependencies:

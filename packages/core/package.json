@@ -1,7 +1,8 @@
 {
   "name": "@agent-notifier/core",
   "version": "0.1.0",
-  "description": "Internal core for agent-notifier.",
+  "private": true,
+  "description": "Internal core for agent-notifier (bundled into the published CLI; not a separately published package).",
   "keywords": [
     "claude",
     "claude-code",
@@ -25,10 +26,6 @@
   },
   "bugs": {
     "url": "https://github.com/JohnPremKumar/agent-notifier/issues"
-  },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
   },
   "type": "module",
   "main": "./dist/index.cjs",

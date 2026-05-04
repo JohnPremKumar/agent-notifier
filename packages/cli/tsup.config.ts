@@ -6,4 +6,8 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'node20',
+  // Bundle the workspace `@agent-notifier/core` package into the CLI dist
+  // so we publish a single self-contained `agent-notifier` package on npm
+  // (no separate core package to publish or version-sync).
+  noExternal: [/^@agent-notifier\/core$/],
 });
