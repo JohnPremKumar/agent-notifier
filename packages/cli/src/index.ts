@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { LogsOpts } from './logs.js';
+import type { InitOpts } from './init.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as {
@@ -26,10 +27,23 @@ program
 
 program
   .command('init')
-  .description('interactive setup')
-  .action(async () => {
+  .description('interactive setup (smart re-init)')
+  .option('--advanced', 'show advanced options (idle gate, sound, icon, schedule)')
+  .option('--tools <list>', 'comma-separated tools to wire (skips checkbox)')
+  .option('--no-test', 'skip the test notification at the end')
+  .option('--schedule <range>', 'HH:MM-HH:MM allow-window')
+  .option('--schedule-days <days>', 'comma-separated days (mon,tue,…)')
+  .option('--idle-gate <mode>', 'idle gate mode')
+  .option('--idle-threshold <seconds>', 'idle threshold in seconds', Number)
+  .option('--unsupported-tab-policy <policy>', 'fire | gate')
+  .option('--sound <name-or-path>', 'mac sound name or absolute audio path')
+  .option('--icon <path>', 'absolute icon path')
+  .option('--kinds <list>', 'comma-separated event kinds')
+  .option('--reset', 'uninstall everything and re-init from scratch')
+  .option('--yes', 'skip confirmations (used with --reset)')
+  .action(async (opts: InitOpts) => {
     const { runInit } = await import('./init.js');
-    await runInit();
+    await runInit(opts);
   });
 program
   .command('install')
