@@ -13,7 +13,16 @@ const program = new Command();
 program
   .name('agent-notifier')
   .description('Cross-platform notifier for AI coding CLIs')
-  .version(pkg.version);
+  .version(pkg.version)
+  // enablePositionalOptions prevents the root --json option from being
+  // consumed when the user passes --json to a subcommand (e.g. `logs --json`).
+  // Each subcommand's own --json option takes precedence when placed after
+  // the subcommand name.
+  .enablePositionalOptions()
+  .option('-q, --quiet', 'suppress non-error output')
+  .option('--json', 'machine-readable output')
+  .option('--no-color', 'disable color')
+  .option('--debug', 'verbose debugging output');
 
 program
   .command('init')
@@ -142,6 +151,96 @@ program
     const { runHook } = await import('./hook.js');
     await runHook(opts.tool);
   });
+
+// Forward-declared types for reset.ts and project.ts (created in Tasks 18/19).
+// The dynamic import() is deferred to runtime — these files do not exist yet.
+// Type assertions below are justified: the shapes are contractual stubs that
+// Tasks 18/19 must satisfy; a mismatch there will surface as a type error at
+// that point, not here.
+interface ResetModule {
+  runReset: (opts: { yes?: boolean }) => Promise<void>;
+}
+interface ProjectModule {
+  runProjectInteractive: () => Promise<void>;
+  runProjectShow: (opts: { project?: string; json?: boolean }) => Promise<void>;
+  runProjectSet: (opts: { enabled?: string; kinds?: string; project?: string }) => Promise<void>;
+  runProjectClear: (opts: { project?: string; yes?: boolean }) => Promise<void>;
+  runProjectList: (opts: { json?: boolean }) => Promise<void>;
+}
+
+program
+  .command('reset')
+  .description('uninstall hooks and delete config (preserves logs)')
+  .option('--yes', 'skip confirmation')
+  .action(async (opts: { yes?: boolean }) => {
+    const { runReset } = (await import('./reset.js')) as ResetModule;
+    await runReset(opts);
+  });
+
+const proj = program.command('project').description('manage per-project notification rules');
+
+proj.action(async () => {
+  const { runProjectInteractive } = (await import('./project.js')) as ProjectModule;
+  await runProjectInteractive();
+});
+
+proj
+  .command('show')
+  .option('--project <path>', 'project path (default: cwd)')
+  .option('--json')
+  .action(async (opts: { project?: string; json?: boolean }) => {
+    const { runProjectShow } = (await import('./project.js')) as ProjectModule;
+    await runProjectShow(opts);
+  });
+
+proj
+  .command('set')
+  .option('--enabled <bool>', 'enable or disable (true/false)')
+  .option('--kinds <list>', 'comma-separated event kinds (PERMISSION,IDLE,TURN_DONE)')
+  .option('--project <path>', 'project path (default: cwd)')
+  .action(async (opts: { enabled?: string; kinds?: string; project?: string }) => {
+    const { runProjectSet } = (await import('./project.js')) as ProjectModule;
+    await runProjectSet(opts);
+  });
+
+proj
+  .command('clear')
+  .option('--project <path>', 'project path (default: cwd)')
+  .option('--yes', 'skip confirmation')
+  .action(async (opts: { project?: string; yes?: boolean }) => {
+    const { runProjectClear } = (await import('./project.js')) as ProjectModule;
+    await runProjectClear(opts);
+  });
+
+proj
+  .command('list')
+  .option('--json')
+  .action(async (opts: { json?: boolean }) => {
+    const { runProjectList } = (await import('./project.js')) as ProjectModule;
+    await runProjectList(opts);
+  });
+
+// Bare-command behavior: with no subcommand, route to init if config is
+// missing (first-run) or status if it exists. Universal flags are honored
+// by both downstream commands.
+// If program.args is non-empty, an unknown subcommand was passed — treat
+// it as an error so `agent-notifier no-such-thing` exits non-zero.
+program.action(async () => {
+  if (program.args.length > 0) {
+    console.error(`error: unknown command '${program.args[0]}'`);
+    program.help({ error: true });
+    return;
+  }
+  const { existsSync } = await import('node:fs');
+  const { configFilePath } = await import('@agent-notifier/core');
+  if (!existsSync(configFilePath())) {
+    const { runInit } = await import('./init.js');
+    await runInit();
+    return;
+  }
+  const { runStatus } = await import('./status.js');
+  await runStatus();
+});
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err));
