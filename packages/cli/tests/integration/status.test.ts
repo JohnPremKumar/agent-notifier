@@ -17,14 +17,24 @@ describe('status — sectioned layout', () => {
   let project: string;
 
   beforeEach(() => {
-    home = realpathSync(mkdtempSync(join(tmpdir(), 'agentst-')));
-    project = join(home, 'p');
+    home = realpathSync(mkdtempSync(join(tmpdir(), 'agentst-home-')));
+    // project is a SEPARATE tmpdir, not nested under home. Windows holds an
+    // OS-level lock on a spawned process's cwd until async release, so if
+    // project lived inside home, rmSync(home) would fail with EBUSY when
+    // it recursed into the still-locked project dir. (See nodejs/node#50101.)
+    project = realpathSync(mkdtempSync(join(tmpdir(), 'agentst-proj-')));
     mkdirSync(join(project, '.git'), { recursive: true });
   });
-  // maxRetries/retryDelay: Windows holds open handles briefly after the
-  // spawned `node BIN` child exits, causing rmSync to EBUSY. The retries
-  // give those handles time to release.
-  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    // Best-effort: project dir may still be cwd-locked on Windows; OS tmp
+    // cleanup will reap it. Don't fail the test on its lingering presence.
+    try {
+      rmSync(project, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // Swallow — Windows cwd-lock is non-deterministic; OS cleans tmp eventually.
+    }
+  });
 
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
 
