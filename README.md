@@ -133,18 +133,18 @@ The default ("fire when elsewhere") only notifies if your active app isn't the A
 ## How it works
 
 ```
-┌──────────────────────┐                ┌─────────────────────┐
-│  Claude / Codex /    │   hook fires   │  agnt hook          │
-│  Gemini / OpenCode   │ ───────────►  │  classify → gate →  │
-│  (your AI CLI)       │   stdin JSON   │  log → notify       │
-└──────────────────────┘                └──────────┬──────────┘
-                                                   │
-                                                   ▼
-                                       ┌────────────────────────┐
-                                       │  node-notifier         │
-                                       │  (mac alerter / win    │
-                                       │   SnoreToast)          │
-                                       └────────────────────────┘
+┌──────────────────────┐                ┌──────────────────────┐
+│  Claude / Codex /    │   hook fires   │  agnt hook           │
+│  Gemini / OpenCode   │  ──────────▶   │  classify → gate →   │
+│  (your AI CLI)       │   stdin JSON   │  log → notify        │
+└──────────────────────┘                └───────────┬──────────┘
+                                                    │
+                                                    ▼
+                                        ┌──────────────────────┐
+                                        │  node-notifier       │
+                                        │  (mac alerter / win  │
+                                        │   SnoreToast)        │
+                                        └──────────────────────┘
 ```
 
 `agnt` installs as a hook in each AI CLI's config (Claude `settings.json`, Codex `config.toml`, Gemini `settings.json`, OpenCode plugin file). When the agent fires an event, our hook runs in <50ms, classifies it, checks the per-tab idle gate, then either notifies you or logs the suppression reason.

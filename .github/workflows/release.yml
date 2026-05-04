@@ -22,6 +22,12 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
+      # npm Trusted Publishing (OIDC) requires npm >= 11.5.1, but the
+      # ubuntu-latest + Node 22 image still ships npm 10.x. Upgrade
+      # globally so `npm publish` (called by changesets) sees the new
+      # version. Once npm 11.5.1+ is the default in setup-node we can
+      # drop this step.
+      - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - uses: changesets/action@v1
