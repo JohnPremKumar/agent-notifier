@@ -19,7 +19,10 @@ import { sym, colorOk, colorDim, spinner } from './lib/ui.js';
 export interface InitOpts {
   advanced?: boolean;
   tools?: string;
+  /** Direct API callers use `noTest: true`; commander `--no-test` maps to `test: false`. Both skip the prompt. */
   noTest?: boolean;
+  /** Commander sets this to false when `--no-test` is passed. Checked alongside noTest. */
+  test?: boolean;
   schedule?: string; // 'HH:MM-HH:MM'
   scheduleDays?: string; // 'mon,tue,wed'
   idleGate?: string;
@@ -236,7 +239,7 @@ async function runInitInner(opts: InitOpts): Promise<void> {
   // Test fire — default Yes on first-run, No on re-init
   const testDefault = !isReinit;
   const wantTest =
-    opts.noTest === true
+    opts.noTest === true || opts.test === false
       ? false
       : await confirm({ message: 'Send a test notification now?', default: testDefault });
   if (wantTest) {

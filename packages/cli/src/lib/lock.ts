@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { configDir } from '@agent-notifier/core';
 
@@ -35,6 +35,10 @@ export function acquireInitLock(): LockResult {
     }
     // stale → fall through and reclaim
   }
+  // Ensure configDir exists before writing the lock file — configDir is only
+  // created by saveConfig, which runs later in the init flow. Without this,
+  // writeFileSync throws ENOENT on a fresh HOME (e.g. smoke test temp dirs).
+  mkdirSync(configDir(), { recursive: true });
   writeFileSync(f, String(process.pid), 'utf8');
   return { ok: true };
 }
