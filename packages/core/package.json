@@ -17,13 +17,14 @@
   ],
   "author": "Johnpremkumar Srinivasan <johnpk305@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/<owner>/agent-notifier",
+  "homepage": "https://github.com/JohnPremKumar/agent-notifier#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/<owner>/agent-notifier.git"
+    "url": "git+https://github.com/JohnPremKumar/agent-notifier.git",
+    "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/<owner>/agent-notifier/issues"
+    "url": "https://github.com/JohnPremKumar/agent-notifier/issues"
   },
   "publishConfig": {
     "access": "public",

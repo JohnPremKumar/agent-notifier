@@ -7,23 +7,33 @@
     "claude-code",
     "codex",
     "gemini",
+    "gemini-cli",
     "opencode",
+    "ai",
+    "agent",
+    "agents",
     "cli",
     "notifier",
+    "notification",
+    "desktop-notifications",
     "macos",
     "windows",
     "hooks",
-    "agents"
+    "developer-tools",
+    "productivity",
+    "terminal",
+    "tui"
   ],
   "author": "Johnpremkumar Srinivasan <johnpk305@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/<owner>/agent-notifier",
+  "homepage": "https://github.com/JohnPremKumar/agent-notifier#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/<owner>/agent-notifier.git"
+    "url": "git+https://github.com/JohnPremKumar/agent-notifier.git",
+    "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/<owner>/agent-notifier/issues"
+    "url": "https://github.com/JohnPremKumar/agent-notifier/issues"
   },
   "publishConfig": {
     "access": "public",
@@ -31,7 +41,8 @@
   },
   "type": "module",
   "bin": {
-    "agent-notifier": "./bin/agent-notifier.js"
+    "agent-notifier": "./bin/agent-notifier.js",
+    "agnt": "./bin/agent-notifier.js"
   },
   "main": "./dist/index.js",
   "files": [
