@@ -44,27 +44,44 @@ jobs:
       - name: Authenticate to npm via OIDC trusted publishing
         run: |
           set -euo pipefail
-          OIDC_RESPONSE=$(curl -fsSL \
+          # GitHub's OIDC endpoint URL-decodes the audience query param,
+          # so we must URL-encode the colon. actions/core does the same
+          # via encodeURIComponent in its getIDToken helper.
+          AUD_RAW="npm:registry.npmjs.org"
+          AUD_ENC="npm%3Aregistry.npmjs.org"
+          OIDC_HTTP_CODE=$(curl -sS -o /tmp/oidc.json -w "%{http_code}" \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org")
-          OIDC_TOKEN=$(echo "$OIDC_RESPONSE" | jq -r '.value')
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "::error::Failed to obtain GitHub Actions OIDC JWT"
-            echo "$OIDC_RESPONSE"
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUD_ENC}")
+          if [ "$OIDC_HTTP_CODE" != "200" ]; then
+            echo "::error::GitHub OIDC token request failed (HTTP $OIDC_HTTP_CODE)"
+            cat /tmp/oidc.json
             exit 1
           fi
-          EXCHANGE_RESPONSE=$(curl -fsSL -X POST \
+          OIDC_TOKEN=$(jq -r '.value' < /tmp/oidc.json)
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "::error::GitHub OIDC response missing .value"
+            cat /tmp/oidc.json
+            exit 1
+          fi
+          echo "::add-mask::$OIDC_TOKEN"
+          EX_HTTP_CODE=$(curl -sS -o /tmp/ex.json -w "%{http_code}" -X POST \
             -H "Content-Type: application/json" \
             -d "{\"id_token\":\"$OIDC_TOKEN\"}" \
             "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/registry")
-          NPM_TOKEN_OIDC=$(echo "$EXCHANGE_RESPONSE" | jq -r '.token')
+          if [ "$EX_HTTP_CODE" != "200" ]; then
+            echo "::error::npm OIDC exchange failed (HTTP $EX_HTTP_CODE)"
+            cat /tmp/ex.json
+            exit 1
+          fi
+          NPM_TOKEN_OIDC=$(jq -r '.token' < /tmp/ex.json)
           if [ -z "$NPM_TOKEN_OIDC" ] || [ "$NPM_TOKEN_OIDC" = "null" ]; then
-            echo "::error::npm refused OIDC token exchange"
-            echo "$EXCHANGE_RESPONSE"
+            echo "::error::npm exchange response missing .token"
+            cat /tmp/ex.json
             exit 1
           fi
           echo "::add-mask::$NPM_TOKEN_OIDC"
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN_OIDC" >> ~/.npmrc
+          rm -f /tmp/oidc.json /tmp/ex.json
           echo "OIDC trusted publishing: short-lived npm token written to ~/.npmrc"
 
       - uses: changesets/action@v1
