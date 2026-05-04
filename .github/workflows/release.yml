@@ -32,28 +32,39 @@ jobs:
       # which does not yet implement the npm OIDC token-exchange flow.
       # Result: the publish runs unauthenticated and fails with ENEEDAUTH.
       #
-      # We do the exchange ourselves: ask GitHub for an OIDC JWT scoped
-      # to the npm registry, POST it to npm's exchange endpoint, get
-      # back a short-lived npm publish token, write it to ~/.npmrc.
-      # `pnpm publish` then reads the token like any other auth.
-      # No long-lived secrets touch the runner; this token expires in
-      # ~5 minutes and is never persisted beyond this job.
+      # The exchange protocol below is what `npm/cli`'s `lib/utils/oidc.js`
+      # does internally:
+      #   1. GET ${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:<registry-host>
+      #      with `Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}`.
+      #      Response body: `{"value": "<JWT>"}`.
+      #   2. POST <registry>/-/npm/v1/oidc/token/exchange/package/<pkg>
+      #      with the JWT as `Authorization: Bearer ${JWT}`. No request
+      #      body. Response body: `{"token": "<short-lived npm token>"}`.
+      # See https://github.com/npm/cli/blob/latest/lib/utils/oidc.js
+      #
+      # The token is short-lived and never persisted past this job. Same
+      # security posture as native trusted publishing — just an explicit
+      # step because the publishing tool is pnpm, not npm.
       #
       # Drop this step once pnpm gains native OIDC trusted-publishing
       # support (track: https://github.com/pnpm/pnpm/issues/9892).
       - name: Authenticate to npm via OIDC trusted publishing
+        env:
+          PKG_NAME: agent-notifier
+          REGISTRY: https://registry.npmjs.org
         run: |
           set -euo pipefail
-          # GitHub's OIDC endpoint URL-decodes the audience query param,
-          # so we must URL-encode the colon. actions/core does the same
-          # via encodeURIComponent in its getIDToken helper.
-          AUD_RAW="npm:registry.npmjs.org"
-          AUD_ENC="npm%3Aregistry.npmjs.org"
-          OIDC_HTTP_CODE=$(curl -sS -o /tmp/oidc.json -w "%{http_code}" \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+
+          # 1. Get a short-lived OIDC JWT from GitHub Actions, scoped to
+          #    the npm registry. Audience must be URL-encoded; actions/core
+          #    does this via encodeURIComponent in its getIDToken helper.
+          AUD_ENC="npm%3A$(echo "$REGISTRY" | sed 's#https\?://##')"
+          OIDC_HTTP=$(curl -sS -o /tmp/oidc.json -w "%{http_code}" \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            -H "Accept: application/json" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUD_ENC}")
-          if [ "$OIDC_HTTP_CODE" != "200" ]; then
-            echo "::error::GitHub OIDC token request failed (HTTP $OIDC_HTTP_CODE)"
+          if [ "$OIDC_HTTP" != "200" ]; then
+            echo "::error::GitHub OIDC token request failed (HTTP $OIDC_HTTP)"
             cat /tmp/oidc.json
             exit 1
           fi
@@ -64,12 +75,16 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$OIDC_TOKEN"
-          EX_HTTP_CODE=$(curl -sS -o /tmp/ex.json -w "%{http_code}" -X POST \
-            -H "Content-Type: application/json" \
-            -d "{\"id_token\":\"$OIDC_TOKEN\"}" \
-            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/registry")
-          if [ "$EX_HTTP_CODE" != "200" ]; then
-            echo "::error::npm OIDC exchange failed (HTTP $EX_HTTP_CODE)"
+
+          # 2. Exchange the JWT with npm for a short-lived publish token.
+          #    The JWT goes in the Authorization header (this is what
+          #    npm-registry-fetch does when given _authToken).
+          EX_HTTP=$(curl -sS -o /tmp/ex.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Accept: application/json" \
+            "${REGISTRY}/-/npm/v1/oidc/token/exchange/package/${PKG_NAME}")
+          if [ "$EX_HTTP" != "200" ]; then
+            echo "::error::npm OIDC exchange failed (HTTP $EX_HTTP)"
             cat /tmp/ex.json
             exit 1
           fi
@@ -80,6 +95,8 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$NPM_TOKEN_OIDC"
+
+          # 3. Write to ~/.npmrc so pnpm publish picks it up.
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN_OIDC" >> ~/.npmrc
           rm -f /tmp/oidc.json /tmp/ex.json
           echo "OIDC trusted publishing: short-lived npm token written to ~/.npmrc"
