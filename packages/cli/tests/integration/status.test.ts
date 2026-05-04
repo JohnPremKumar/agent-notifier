@@ -21,7 +21,10 @@ describe('status — sectioned layout', () => {
     project = join(home, 'p');
     mkdirSync(join(project, '.git'), { recursive: true });
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  // maxRetries/retryDelay: Windows holds open handles briefly after the
+  // spawned `node BIN` child exits, causing rmSync to EBUSY. The retries
+  // give those handles time to release.
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
 

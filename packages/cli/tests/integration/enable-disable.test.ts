@@ -16,7 +16,7 @@ describe('enable / disable', () => {
     projectDir = join(home, 'project-x');
     mkdirSync(join(projectDir, '.git'), { recursive: true });
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
   const cfg = () =>

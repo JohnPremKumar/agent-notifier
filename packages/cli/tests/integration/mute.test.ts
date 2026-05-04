@@ -17,7 +17,7 @@ describe('mute / unmute', () => {
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'agentmute-'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
   const cfg = () =>
     JSON.parse(readFileSync(join(home, '.agent-notifier', 'config.json'), 'utf8')) as MuteCfg;

@@ -55,7 +55,7 @@ describe('logs', () => {
         .join('\n') + '\n';
     writeFileSync(logFile, lines);
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
 
   it('--tail 2 prints the last 2 entries', () => {

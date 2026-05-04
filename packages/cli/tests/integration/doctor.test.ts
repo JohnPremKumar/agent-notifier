@@ -14,7 +14,7 @@ describe('doctor (stub notifier)', () => {
     home = mkdtempSync(join(tmpdir(), 'agentdoc-'));
     mkdirSync(join(home, '.claude'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
   const env = () => ({
     ...process.env,

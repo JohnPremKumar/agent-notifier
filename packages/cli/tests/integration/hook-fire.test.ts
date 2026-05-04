@@ -23,7 +23,7 @@ describe('hook → notify pipeline (stubbed notifier)', () => {
       JSON.stringify({ version: 2, tz: 'UTC', idleGate: { mode: 'always-fire' } }),
     );
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
   const env = () => ({
     ...process.env,
