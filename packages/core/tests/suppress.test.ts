@@ -133,4 +133,23 @@ describe('evaluateSuppression with new gate', () => {
     expect(r.gateMode).toBe('always-fire');
     expect(r.gateDecision).toBe('mode-always-fire');
   });
+
+  it('returns gate:* reason and full gate metadata when strict-os-idle suppresses', async () => {
+    const c = cfg((c) => {
+      c.idleGate.mode = 'strict-os-idle';
+      c.idleGate.thresholdSeconds = 60;
+    });
+    // ioreg output reports 5 seconds idle (5 * 1e9 ns) — well below the 60s threshold.
+    const exec = vi.fn().mockResolvedValue({
+      stdout: '"HIDIdleTime" = 5000000000',
+      stderr: '',
+    });
+    const r = await evaluateSuppression(c, NOW, event(), PROJ, 12345, {
+      gateOpts: { exec, platform: 'darwin' },
+    });
+    expect(r.fire).toBe(false);
+    expect(r.reason).toBe('gate:os-active');
+    expect(r.gateMode).toBe('strict-os-idle');
+    expect(r.gateDecision).toBe('os-active');
+  });
 });

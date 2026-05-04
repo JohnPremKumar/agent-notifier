@@ -18,9 +18,19 @@ export interface LogEntry {
   sessionId: string;
   fired: boolean;
   suppressReason?: string;
-  /** Gate mode in effect when the notification decision was made (Phase H observability). */
+  /**
+   * Gate mode in effect when the notification decision was made (Phase H observability).
+   * Typed as `string` to keep the logger decoupled from idle-gate internals; legal
+   * values are the union from `Config['idleGate']['mode']` in `./types.ts`
+   * (`fire-elsewhere` | `always-fire` | `strict-terminal` | `strict-os-idle`).
+   */
   gateMode?: string;
-  /** Decision reason from decideGate (Phase H observability). */
+  /**
+   * Decision reason from decideGate (Phase H observability). Typed as `string` to
+   * keep the logger decoupled from idle-gate internals; legal values are the
+   * `GateDecision` union exported from `./idle-gate.ts`.
+   * @see GateDecision
+   */
   gateDecision?: string;
   msg?: string;
   error?: string;

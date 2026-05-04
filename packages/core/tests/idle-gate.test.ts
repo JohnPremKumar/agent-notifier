@@ -137,6 +137,14 @@ describe('process tree walk', () => {
     expect(term).toBeNull();
   });
 
+  it('walkUpToTerminal returns null when chain exhausts MAX_DEPTH without finding a terminal', async () => {
+    const big: Record<string, { ppid: string; comm: string; tty: string }> = {};
+    for (let i = 0; i < 20; i++) big[String(i)] = { ppid: String(i + 1), comm: 'bash', tty: '??' };
+    const exec = psStub(big);
+    const term = await walkUpToTerminal(0, { exec, platform: 'darwin' });
+    expect(term).toBeNull();
+  });
+
   it('getProcessTty parses ttys003 and rejects placeholder ??', async () => {
     const exec = psStub({
       '7': { ppid: '1', comm: 'x', tty: 'ttys003' },

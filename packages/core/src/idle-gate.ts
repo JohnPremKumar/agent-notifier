@@ -122,6 +122,13 @@ export async function getProcessTty(
  * to defend against pathological process trees.
  *
  * Returns null if no AI tool found in the chain.
+ *
+ * Known limitations (both fail-open at the call site, preserving the trust contract):
+ * - Windows: SHELLS does not include cmd.exe/pwsh.exe/powershell.exe; if a Windows hook
+ *   is wrapped by one of those, walk terminates after the first iteration → null →
+ *   fail-open fire. Add Windows shell names here when v1 Windows support lands.
+ * - process.ppid can be 0 on Windows if the parent has exited before the hook runs;
+ *   the `pid <= 1` guard handles this and returns null → fail-open.
  */
 export async function resolveAiPid(
   startPid: number,
@@ -273,10 +280,16 @@ export async function decideGate(
     } else {
       result = await decideFireElsewhere(config, hookPpid, mode, opts);
     }
+    /* c8 ignore start — defense-in-depth: every OS probe (getIdleSeconds,
+       resolveAiPid, getProcessTty, walkUpToTerminal, getFrontmostBundle, lookup)
+       has its own fail-open try/catch returning null/Infinity. Reaching this
+       outer catch would require an unexpected throw from a non-probe call site;
+       it's not exercisable from current code paths but is kept as a safety net. */
   } catch {
     // fail-open: any unhandled OS-probe failure → fire so we don't swallow notifications
     result = { fire: true, reason: 'fail-open' };
   }
+  /* c8 ignore stop */
   gateCache.set(cacheKey, { value: result, ts: Date.now() });
   return result;
 }
