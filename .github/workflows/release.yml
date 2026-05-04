@@ -21,13 +21,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          registry-url: 'https://registry.npmjs.org'
-      # npm Trusted Publishing (OIDC) requires npm >= 11.5.1, but the
-      # ubuntu-latest + Node 22 image still ships npm 10.x. Upgrade
-      # globally so `npm publish` (called by changesets) sees the new
-      # version. Once npm 11.5.1+ is the default in setup-node we can
-      # drop this step.
-      - run: npm install -g npm@latest
+          # No registry-url here on purpose. setup-node's registry-url writes
+          # ~/.npmrc with `_authToken=${NODE_AUTH_TOKEN}`, and any token in
+          # the environment short-circuits OIDC. With pnpm >= 10.16 + a
+          # configured Trusted Publisher on npmjs.com, omitting the token
+          # path lets pnpm publish negotiate an OIDC token automatically.
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - uses: changesets/action@v1
@@ -36,11 +34,4 @@ jobs:
           version: pnpm changeset version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # setup-node@v4 with `registry-url` writes ~/.npmrc with the
-          # literal placeholder ${NODE_AUTH_TOKEN}, expanded by npm at
-          # publish time. We pass the same token under both names so
-          # changesets/action (which reads NPM_TOKEN) and the .npmrc
-          # auth (which reads NODE_AUTH_TOKEN) both work.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
