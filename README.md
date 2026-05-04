@@ -12,14 +12,14 @@ Permission requests. Idle prompts. Finished turns. One install, every agent, eve
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/node/v/agent-notifier.svg)](https://nodejs.org)
 
+</div>
+
 ```bash
 npm install -g agent-notifier
 agnt
 ```
 
 That's it. The wizard detects every AI CLI you have, wires it up, and fires a test notification. Done in under 30 seconds.
-
-</div>
 
 ---
 
