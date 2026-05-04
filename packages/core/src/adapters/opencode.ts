@@ -22,25 +22,51 @@ export function classifyOpenCode(payload: unknown): Event | null {
     ...(tool !== undefined && { message: tool }),
   };
 
-  if (type === 'permission.requested') return { ...base, kind: 'PERMISSION' };
-  if (type === 'session.completed') return { ...base, kind: 'TURN_DONE' };
+  // Map the OpenCode plugin event names (Hooks API in @opencode-ai/plugin)
+  // to our internal Event kinds. `permission.ask` is a typed Hooks key;
+  // `session.idle` arrives via the catch-all `event` hook in the plugin.
+  if (type === 'permission.ask') return { ...base, kind: 'PERMISSION' };
+  if (type === 'session.idle') return { ...base, kind: 'TURN_DONE' };
   return null;
 }
 
+// Plugin contract: @opencode-ai/plugin@1.4.7
+//   Plugin = (input: PluginInput, options?) => Promise<Hooks>
+//   Auto-loaded from ~/.config/opencode/plugins/*.js (no opencode.json registration needed).
+//   Hooks supports `permission.ask` directly; `session.idle` is delivered
+//   via the generic `event` catch-all (not a top-level key).
 export const OPENCODE_PLUGIN_SOURCE = `// agent-notifier opencode plugin (auto-generated; do not edit)
-// Usage: agent-notifier hook --tool opencode
+// Triggers desktop notifications via the agent-notifier CLI on permission
+// asks and session-idle (turn-done) events.
 import { spawn } from 'node:child_process';
 
-export default function agentNotifier({ app }) {
-  const fire = (type, ev) => {
-    const payload = JSON.stringify({ type, sessionID: ev.sessionID, cwd: ev.cwd ?? process.cwd(), tool: ev.tool });
-    const p = spawn('agent-notifier', ['hook', '--tool', 'opencode'], { stdio: ['pipe', 'ignore', 'ignore'], detached: true });
-    p.stdin.end(payload);
-    p.unref();
+export const AgentNotifier = async ({ directory }) => {
+  const fire = (payload) => {
+    const child = spawn('agent-notifier', ['hook', '--tool', 'opencode'], {
+      stdio: ['pipe', 'ignore', 'ignore'],
+      detached: true,
+    });
+    child.stdin.end(JSON.stringify(payload));
+    child.unref();
   };
   return {
-    'permission.requested': (ev) => fire('permission.requested', ev),
-    'session.completed':    (ev) => fire('session.completed', ev),
+    'permission.ask': async (input) => {
+      fire({
+        type: 'permission.ask',
+        sessionID: input.sessionID,
+        cwd: directory,
+        tool: input.title,
+      });
+    },
+    event: async ({ event }) => {
+      if (event.type === 'session.idle') {
+        fire({
+          type: 'session.idle',
+          sessionID: event.properties.sessionID,
+          cwd: directory,
+        });
+      }
+    },
   };
-}
+};
 `;

@@ -1,5 +1,5 @@
 {
-  "type": "permission.requested",
+  "type": "permission.ask",
   "sessionID": "oc-7",
   "cwd": "/Users/x/oc-app",
   "tool": "edit"

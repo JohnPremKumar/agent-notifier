@@ -1,5 +1,5 @@
 {
-  "type": "session.completed",
+  "type": "session.idle",
   "sessionID": "oc-7",
   "cwd": "/Users/x/oc-app"
 }
