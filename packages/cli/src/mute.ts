@@ -1,6 +1,6 @@
-import kleur from 'kleur';
 import { ConfigStore, configFilePath } from '@agent-notifier/core';
 import { parseDuration } from './lib/duration.js';
+import { sym, colorOk, colorWarn } from './lib/ui.js';
 
 export async function runMute(input: string): Promise<void> {
   await Promise.resolve();
@@ -9,7 +9,7 @@ export async function runMute(input: string): Promise<void> {
   store.update((c) => {
     c.mute = { until: until.toISOString() };
   });
-  console.log(`${kleur.yellow('🔇')} muted until ${until.toISOString()}`);
+  console.log(`${colorWarn(sym.dash)} muted until ${until.toISOString()}`);
 }
 
 export async function runUnmute(): Promise<void> {
@@ -18,5 +18,5 @@ export async function runUnmute(): Promise<void> {
   store.update((c) => {
     c.mute = null;
   });
-  console.log(`${kleur.green('🔔')} unmuted`);
+  console.log(`${colorOk(sym.flow)} unmuted`);
 }
