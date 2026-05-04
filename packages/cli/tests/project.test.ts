@@ -91,6 +91,30 @@ describe('project subcommand', () => {
       );
       expect(out).toContain('default');
     });
+
+    it('renders enabled=true entry with all-kinds fallback', async () => {
+      const { runProjectSet, runProjectShow } = await import('../src/project.js');
+      await runProjectSet({ enabled: 'true', kinds: 'all', project: home });
+      const out = strip(
+        await captureLog(async () => {
+          await runProjectShow({ project: home, json: false });
+        }),
+      );
+      expect(out).toContain('yes');
+      expect(out).toContain('all');
+    });
+
+    it('renders enabled=false entry (covers ✗ no branch)', async () => {
+      const { runProjectSet, runProjectShow } = await import('../src/project.js');
+      await runProjectSet({ enabled: 'false', kinds: 'PERMISSION', project: home });
+      const out = strip(
+        await captureLog(async () => {
+          await runProjectShow({ project: home, json: false });
+        }),
+      );
+      expect(out).toContain('no');
+      expect(out).toContain('PERMISSION');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -240,6 +264,49 @@ describe('project subcommand', () => {
       expect(entry?.enabled).toBe(true);
       // all 3 kinds selected → stored as undefined (all kinds)
       expect(entry?.kinds).toBeUndefined();
+    });
+
+    it('displays existing entry status (enabled, with explicit kinds list)', async () => {
+      const { checkbox, confirm, runProjectSet, runProjectInteractive } = await (async () => {
+        const inq = await import('@inquirer/prompts');
+        const proj = await import('../src/project.js');
+        return { ...inq, ...proj };
+      })();
+      // Pre-populate an entry so the "if (entry)" branch on line 48 is taken.
+      await runProjectSet({ enabled: 'true', kinds: 'PERMISSION,IDLE', project: home });
+      (confirm as Mock).mockResolvedValueOnce(false);
+      (checkbox as Mock).mockResolvedValueOnce([]);
+
+      const out = strip(
+        await captureLog(async () => {
+          await runProjectInteractive(home);
+        }),
+      );
+      // Status line should reflect the existing entry, not "not configured"
+      expect(out).toContain('enabled');
+      expect(out).toContain('PERMISSION');
+      expect(out).not.toContain('not configured');
+    });
+
+    it('displays existing entry status (disabled, all kinds default)', async () => {
+      const { checkbox, confirm, runProjectSet, runProjectInteractive } = await (async () => {
+        const inq = await import('@inquirer/prompts');
+        const proj = await import('../src/project.js');
+        return { ...inq, ...proj };
+      })();
+      // Pre-populate disabled entry with no kinds filter (kinds=undefined → 'all')
+      await runProjectSet({ enabled: 'false', kinds: 'all', project: home });
+      (confirm as Mock).mockResolvedValueOnce(false);
+      (checkbox as Mock).mockResolvedValueOnce([]);
+
+      const out = strip(
+        await captureLog(async () => {
+          await runProjectInteractive(home);
+        }),
+      );
+      // Covers `entry.enabled ? 'enabled' : 'disabled'` false branch + `?? 'all'` fallback
+      expect(out).toContain('disabled');
+      expect(out).toContain('all');
     });
   });
 });
