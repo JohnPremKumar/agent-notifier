@@ -55,9 +55,12 @@ program
 program
   .command('status')
   .description('print current config + recent logs')
-  .action(async () => {
+  .option('-v, --verbose', 'show extra detail')
+  .option('--json', 'machine-readable output')
+  .option('-q, --quiet', 'suppress non-error output')
+  .action(async (opts: { verbose?: boolean; json?: boolean; quiet?: boolean }) => {
     const { runStatus } = await import('./status.js');
-    await runStatus();
+    await runStatus(opts);
   });
 
 program
