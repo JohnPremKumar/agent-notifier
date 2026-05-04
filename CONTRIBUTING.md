@@ -38,18 +38,26 @@ To raise the global lines/functions threshold back to the spec target of 90%, ad
 6. Add `packages/cli/src/lib/installers/<tool>.ts` and tests; register in `allInstallers()` in `packages/cli/src/install.ts`.
 7. Update README support matrix.
 
-## Release smoke
+## Release smoke checklist
 
 Before publishing a release:
 
-1. **macOS VM (clean install)**
+1. **Automated smoke** — run `pnpm test:smoke` (Task 22): verifies the tarball includes bundled icons (`assets/icon.png`, `icon.icns`, `icon.ico`) and exercises the new wizard, project, and reset commands end-to-end.
+
+2. **macOS VM (clean install)**
    - `npm i -g agent-notifier`
-   - `agent-notifier install` → `init` → `doctor` → all three test notifications visible.
+   - Run `agent-notifier` with no arguments against a fresh `HOME` directory. Verify the wizard banner reads `agent-notifier — set up` (first-run) and completes without error.
+   - Re-run `agent-notifier` in the same `HOME`. Verify the banner reads `agent-notifier — reconfigure` and preselects the currently-wired tools.
+   - `agent-notifier doctor` → all test notifications visible.
    - `mute 30s` → notifications suppressed; wait → resumes.
+   - `cd` into a git-rooted project, run `agent-notifier project`. Verify the interactive editor saves correctly: `agent-notifier project show` reflects the saved values.
    - `disable` in a git-rooted project → notifications suppressed; check `logs --suppressed --project .` shows `project-disabled`.
    - `schedule add --deny --days $TODAY --from 00:00 --to 23:59 --id all` → all suppressed; `schedule clear` → resumed.
+   - `agent-notifier reset --yes` → verify config file is gone, but `~/.agent-notifier/log/` remains intact. Verify each previously-touched dotfile is restored from `.agent-notifier.bak`.
    - `uninstall` → diff every touched dotfile against pre-install backup → byte-identical.
-2. **Windows VM** — same checklist.
-3. **Real-world session:** start a Claude Code session, run `npm test` (or any 60s+ command), step away, confirm notification arrives within 5s of completion / permission prompt.
+
+3. **Windows VM** — same checklist.
+
+4. **Real-world session:** start a Claude Code session, run `npm test` (or any 60s+ command), step away, confirm notification arrives within 5s of completion / permission prompt.
 
 If any step fails, fix before publish.
