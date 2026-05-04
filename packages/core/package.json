@@ -1,6 +1,6 @@
 {
   "name": "@agent-notifier/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Internal core for agent-notifier.",
   "keywords": [
     "claude",
@@ -41,7 +41,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "assets"
   ],
   "scripts": {
     "build": "tsup",

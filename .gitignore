@@ -1,6 +1,9 @@
 node_modules/
 dist/
 coverage/
+# Build-time icon copy from src/assets/ → assets/ (see packages/core/tsup.config.ts).
+# Source-of-truth lives in packages/core/src/assets/ and IS committed.
+packages/core/assets/
 .DS_Store
 *.log
 *.tmp
