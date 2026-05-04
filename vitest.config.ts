@@ -28,6 +28,12 @@ export default defineConfig({
           name: 'unit',
           include: ['packages/*/tests/**/*.test.ts'],
           exclude: ['packages/*/tests/integration/**'],
+          // Unit tests are fast (<100ms each) on macOS, but the FIRST
+          // `await import('../src/...')` in a file pays cold-resolution cost
+          // for the workspace's transitive ESM graph. On Windows + Node 20 in
+          // CI we observed this exceeding the 5s default. 15s is generous
+          // headroom; truly slow tests still surface in summary output.
+          testTimeout: 15000,
         },
       },
       {
