@@ -83,7 +83,9 @@ jobs:
             -H "Authorization: Bearer $OIDC_TOKEN" \
             -H "Accept: application/json" \
             "${REGISTRY}/-/npm/v1/oidc/token/exchange/package/${PKG_NAME}")
-          if [ "$EX_HTTP" != "200" ]; then
+          # npm returns 201 Created on successful exchange (observed in
+          # production); some edges may return 200. Accept either.
+          if [ "$EX_HTTP" != "200" ] && [ "$EX_HTTP" != "201" ]; then
             echo "::error::npm OIDC exchange failed (HTTP $EX_HTTP)"
             cat /tmp/ex.json
             exit 1
