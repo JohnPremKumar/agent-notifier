@@ -14,7 +14,7 @@ Run this inside any project directory:
 
 ```bash
 cd ~/repos/my-project
-agent-notifier project
+agnt project
 ```
 
 ```
@@ -30,8 +30,10 @@ agent-notifier — project rules
     [x] TURN_DONE     agent finishes a turn
     [x] IDLE          agent waiting on you for 60s+
 
-  ✓ saved. Run `agent-notifier project show` to confirm.
+  ✓ saved. Run `agnt project show` to confirm.
 ```
+
+> **Note:** the banner reads `agent-notifier — project rules` because that's the formal product name embedded in the binary; `agnt` is the recommended way to invoke it.
 
 When project rules already exist, every prompt preselects the current value. Pressing enter through the wizard is a no-op.
 
@@ -40,45 +42,45 @@ When project rules already exist, every prompt preselects the current value. Pre
 **Silence a noisy project:**
 ```bash
 cd ~/repos/big-monorepo
-agent-notifier project set --enabled=false
+agnt project set --enabled=false
 ```
 
 **Only fire on permission requests for this project:**
 ```bash
-agent-notifier project set --kinds=PERMISSION
+agnt project set --kinds=PERMISSION
 ```
 
 **Fire on all event kinds (clear any kind filter):**
 ```bash
-agent-notifier project set --kinds=all
+agnt project set --kinds=all
 ```
 
 **Combine options in one command:**
 ```bash
-agent-notifier project set --enabled=true --kinds=PERMISSION,IDLE
+agnt project set --enabled=true --kinds=PERMISSION,IDLE
 ```
 
 **Target a project by path instead of cwd:**
 ```bash
-agent-notifier project set --enabled=false --project=/absolute/path/to/project
+agnt project set --enabled=false --project=/absolute/path/to/project
 ```
 
 **Show the effective rules for the current project:**
 ```bash
-agent-notifier project show
-agent-notifier project show --json     # machine-readable
+agnt project show
+agnt project show --json     # machine-readable
 ```
 
 **List all configured projects:**
 ```bash
-agent-notifier project list
-agent-notifier project list --json
+agnt project list
+agnt project list --json
 ```
 
 **Remove rules for the current project (falls back to global default):**
 ```bash
-agent-notifier project clear
-agent-notifier project clear --yes     # skip confirmation
+agnt project clear
+agnt project clear --yes     # skip confirmation
 ```
 
 ## Project keys
@@ -92,7 +94,7 @@ This means:
 
 You can see the resolved key for any directory:
 ```bash
-agent-notifier project show --json | grep '"project"'
+agnt project show --json | grep '"project"'
 ```
 
-Or by running `agent-notifier status` from inside the project — the `This project` section shows the resolved display name and whether any rules are configured.
+Or by running `agnt status` from inside the project — the `This project` section shows the resolved display name and whether any rules are configured.

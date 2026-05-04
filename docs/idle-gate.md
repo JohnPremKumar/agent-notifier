@@ -55,7 +55,7 @@ All failure modes (AppleScript permission denied, timeout, `ps` returns nothing,
 
 ## Modes
 
-Set via `agent-notifier init --advanced` or `agent-notifier init --idle-gate=<mode>`.
+Set via `agnt init --advanced` or `agnt init --idle-gate=<mode>`.
 
 | Mode | Behavior |
 |---|---|
@@ -110,31 +110,31 @@ When `idleGate.mode` is `fire-elsewhere` and the terminal does not expose active
 | `fire` *(default)* | Fire the notification even though we can't confirm you're on a different tab. You may get a ping while looking at the agent's output. | Recommended for most users. Never miss a notification. |
 | `gate` | Treat the whole terminal app as in-focus and suppress. You will not be paged while that terminal app is frontmost, regardless of which tab. | Choose this if you get too many notifications on Ghostty / Alacritty. |
 
-Set via `agent-notifier init --unsupported-tab-policy=fire|gate`.
+Set via `agnt init --unsupported-tab-policy=fire|gate`.
 
 ## Troubleshooting
 
 **I'm getting too many notifications in Ghostty / Alacritty.**
 Set the policy to `gate`:
 ```bash
-agent-notifier init --unsupported-tab-policy=gate
+agnt init --unsupported-tab-policy=gate
 ```
 
 **I'm not getting notifications when I expect them.**
 Check whether gate detection failed. Run:
 ```bash
-agent-notifier logs --tail=20
+agnt logs --tail=20
 ```
 Each entry has a `gateDecision` field. `fail-open` means a detection probe failed (AppleScript permission denied? `ps` timeout?). `frontmost-same-tab` means the notifier correctly detected you were on the agent's tab and suppressed.
 
 For live gate diagnostics:
 ```bash
-agent-notifier status --verbose
+agnt status --verbose
 ```
 This shows the current mode, threshold, and policy under the `Idle gate` section.
 
 **macOS Accessibility permission denied.**
-`agent-notifier doctor` flags this. The fix is **System Settings → Privacy & Security → Accessibility** — find agent-notifier (or the Node.js binary running it) and check the box. After granting permission, subsequent hook fires will use full per-tab detection.
+`agnt doctor` flags this. The fix is **System Settings → Privacy & Security → Accessibility** — find agent-notifier (or the Node.js binary running it) and check the box. After granting permission, subsequent hook fires will use full per-tab detection.
 
 **The `gateDecision` field is always `fail-open`.**
-This usually means the osascript call is timing out (200ms budget). It can happen if System Events is slow to respond after a cold start. Run `agent-notifier doctor` — it fires a test notification and logs the result, making it easy to see whether the detection path is working.
+This usually means the osascript call is timing out (200ms budget). It can happen if System Events is slow to respond after a cold start. Run `agnt doctor` — it fires a test notification and logs the result, making it easy to see whether the detection path is working.

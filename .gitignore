@@ -4,12 +4,34 @@ coverage/
 # Build-time icon copy from src/assets/ → assets/ (see packages/core/tsup.config.ts).
 # Source-of-truth lives in packages/core/src/assets/ and IS committed.
 packages/core/assets/
+
+# Pack artifacts (we publish via `pnpm publish`, never commit tarballs)
+*.tgz
+
+# Editor / OS noise
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and scratch
 *.log
 *.tmp
 *.bak
+
+# Secrets
 .env
 .env.*
 !.env.example
+
+# Caches
 .vitest-cache/
 .eslintcache
+
+# Local Claude Code session data — useful between local sessions, never public
+.claude/
+
+# Local graphify output (regenerable)
+graphify-out/

@@ -3,7 +3,7 @@
 ## Dev setup
 
 ```bash
-git clone <repo>
+git clone https://github.com/JohnPremKumar/agent-notifier.git
 cd agent-notifier
 pnpm install
 pnpm test
@@ -46,15 +46,15 @@ Before publishing a release:
 
 2. **macOS VM (clean install)**
    - `npm i -g agent-notifier`
-   - Run `agent-notifier` with no arguments against a fresh `HOME` directory. Verify the wizard banner reads `agent-notifier — set up` (first-run) and completes without error.
-   - Re-run `agent-notifier` in the same `HOME`. Verify the banner reads `agent-notifier — reconfigure` and preselects the currently-wired tools.
-   - `agent-notifier doctor` → all test notifications visible.
-   - `mute 30s` → notifications suppressed; wait → resumes.
-   - `cd` into a git-rooted project, run `agent-notifier project`. Verify the interactive editor saves correctly: `agent-notifier project show` reflects the saved values.
-   - `disable` in a git-rooted project → notifications suppressed; check `logs --suppressed --project .` shows `project-disabled`.
-   - `schedule add --deny --days $TODAY --from 00:00 --to 23:59 --id all` → all suppressed; `schedule clear` → resumed.
-   - `agent-notifier reset --yes` → verify config file is gone, but `~/.agent-notifier/log/` remains intact. Verify each previously-touched dotfile is restored from `.agent-notifier.bak`.
-   - `uninstall` → diff every touched dotfile against pre-install backup → byte-identical.
+   - Run `agnt` with no arguments against a fresh `HOME` directory. Verify the wizard banner reads `agent-notifier — set up` (first-run) and completes without error.
+   - Re-run `agnt` in the same `HOME`. Verify the banner reads `agent-notifier — reconfigure` and preselects the currently-wired tools.
+   - `agnt doctor` → all test notifications visible.
+   - `agnt mute 30s` → notifications suppressed; wait → resumes.
+   - `cd` into a git-rooted project, run `agnt project`. Verify the interactive editor saves correctly: `agnt project show` reflects the saved values.
+   - `agnt disable` in a git-rooted project → notifications suppressed; check `agnt logs --suppressed --project .` shows `project-disabled`.
+   - `agnt schedule add --deny --days $TODAY --from 00:00 --to 23:59 --id all` → all suppressed; `agnt schedule clear` → resumed.
+   - `agnt reset --yes` → verify config file is gone, but `~/.agent-notifier/log/` remains intact. Verify each previously-touched dotfile is restored from `.agent-notifier.bak`.
+   - `agnt uninstall` → diff every touched dotfile against pre-install backup → byte-identical.
 
 3. **Windows VM** — same checklist.
 

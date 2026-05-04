@@ -1,8 +1,10 @@
 # Onboarding guide
 
+> **Throughout these docs we use `agnt` — the short alias for `agent-notifier`.** Both binaries are installed; pick whichever you prefer.
+
 ## First run
 
-Type `agent-notifier` with no arguments on a machine where no config exists yet. The wizard runs automatically.
+Type `agnt` with no arguments on a machine where no config exists yet. The wizard runs automatically.
 
 ```
 agent-notifier — set up
@@ -27,17 +29,17 @@ agent-notifier — set up
       · an agent goes idle for 60s while waiting on you
     …unless you're focused on the same terminal tab the agent is running in.
 
-  Pro tip: `agent-notifier init --advanced` for schedules, sound, gate options.
-           `agent-notifier project` (in any project dir) for per-project rules.
+  Pro tip: `agnt init --advanced` for schedules, sound, gate options.
+           `agnt project` (in any project dir) for per-project rules.
 ```
 
 The wizard takes at most two answers: which tools to wire (preselected to all detected), and whether to send a test notification (default yes). Hit enter twice and you're done.
 
-Each tool's dotfile is backed up to `<file>.agent-notifier.bak` before any change is written. If something goes wrong, run `agent-notifier uninstall` and every file is restored byte-for-byte.
+Each tool's dotfile is backed up to `<file>.agent-notifier.bak` before any change is written. If something goes wrong, run `agnt uninstall` and every file is restored byte-for-byte.
 
 ## Re-init
 
-Run `agent-notifier init` again on a machine that already has a config. The wizard is identical except:
+Run `agnt init` again on a machine that already has a config. The wizard is identical except:
 
 - The banner reads `agent-notifier — reconfigure` instead of `agent-notifier — set up`.
 - The tools checkbox preselects the tools that are currently wired.
@@ -50,7 +52,7 @@ If you have edited `~/.agent-notifier/config.json` by hand, `init` writes a time
 ## Advanced flow (`--advanced`)
 
 ```bash
-agent-notifier init --advanced
+agnt init --advanced
 ```
 
 After the basic tool-wiring prompt, the advanced flow adds:
@@ -86,7 +88,7 @@ Any flag passed to `init` makes that field non-interactive. Fields not covered b
 Full non-interactive example (no prompts):
 
 ```bash
-agent-notifier init --tools=claude-code,codex --no-test --idle-gate=fire-elsewhere --idle-threshold=60
+agnt init --tools=claude-code,codex --no-test --idle-gate=fire-elsewhere --idle-threshold=60
 ```
 
 ## Defaults table
@@ -120,6 +122,6 @@ When you first run a test notification (or when a real notification fires), macO
 
 **What to do:** Click Allow. Then go to **System Settings → Privacy & Security → Accessibility** and confirm that `agent-notifier` (or the Node.js binary, depending on your setup) is listed and checked.
 
-**What if you deny it?** The notifier falls back to fail-open: it fires every notification regardless of what tab you're in, as if `idleGate.mode` were `always-fire`. You will not miss notifications; you will just get more of them. `agent-notifier status --verbose` shows `gate-detection-unavailable` in that case.
+**What if you deny it?** The notifier falls back to fail-open: it fires every notification regardless of what tab you're in, as if `idleGate.mode` were `always-fire`. You will not miss notifications; you will just get more of them. `agnt status --verbose` shows `gate-detection-unavailable` in that case.
 
-`agent-notifier doctor` will flag a missing Accessibility permission and tell you the exact System Settings path to fix it.
+`agnt doctor` will flag a missing Accessibility permission and tell you the exact System Settings path to fix it.
