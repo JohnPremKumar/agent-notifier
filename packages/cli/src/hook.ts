@@ -73,6 +73,6 @@ export async function runHook(toolFlag: string): Promise<void> {
   if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') {
     stubNotifyAppend(configDir(), event);
   } else {
-    await fireNotification(event);
+    await fireNotification(event, { config });
   }
 }

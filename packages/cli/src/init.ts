@@ -90,7 +90,7 @@ export async function runInit(): Promise<void> {
         message: `init test ${kind}`,
       };
       if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stubNotifyAppend(configDir(), ev);
-      else await fireNotification(ev);
+      else await fireNotification(ev, { config: cfg });
     }
   }
 

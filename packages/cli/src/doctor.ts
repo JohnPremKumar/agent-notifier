@@ -59,16 +59,17 @@ export async function runDoctor(): Promise<void> {
   }
   console.log('');
 
-  console.log('firing 3 test notifications…');
-  for (const e of TEST_EVENTS) {
-    if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stubNotifyAppend(configDir(), e);
-    else await fireNotification(e);
-  }
-
   const cfg = new ConfigStore(
     configFilePath(),
     Intl.DateTimeFormat().resolvedOptions().timeZone,
   ).load();
+
+  console.log('firing 3 test notifications…');
+  for (const e of TEST_EVENTS) {
+    if (process.env['AGENT_NOTIFIER_NOTIFY_IMPL'] === 'stub') stubNotifyAppend(configDir(), e);
+    else await fireNotification(e, { config: cfg });
+  }
+
   const log = loggerFromConfig(cfg, logDir());
   const tail = log.readTail(5);
   if (tail.length > 0) {
