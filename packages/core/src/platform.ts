@@ -9,7 +9,12 @@ export function configDir(): string {
   if (process.platform === 'win32') {
     const appData = process.env['APPDATA'];
     if (!appData) throw new Error('APPDATA env var not set on Windows');
-    return path.win32.join(appData, 'agent-notifier');
+    // Use `.agent-notifier` on Windows too (not `agent-notifier`).
+    // Dotted directory names are perfectly valid on NTFS, and using
+    // the same name on both platforms gives users a consistent mental
+    // model and lets cross-platform test paths match without
+    // per-platform helpers.
+    return path.win32.join(appData, '.agent-notifier');
   }
   // Use path.posix explicitly: `path.join` resolves to the host OS's
   // separator at module-load time, so on a Windows host with a mocked

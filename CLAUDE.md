@@ -63,7 +63,7 @@ docs/{superpowers/specs,adapters,CONTRIBUTING.md}
 .github/workflows/{ci.yml,release.yml}
 ```
 
-**Adapter contract:** `export function classify(payload: unknown): Event | null` — never throws, returns `null` for unmapped events. **Single notify chokepoint:** all dispatch flows through `core/notify.ts`; idle-gating, sound selection, logging applied there. **Backup before edit:** every write to `~/.claude/settings.json`, `~/.codex/config.toml`, etc. copies to `<file>.agent-notifier.bak` first; `uninstall` restores. **Config dir:** `~/.agent-notifier/` (mac) / `%APPDATA%\agent-notifier\` (win), subdirs `log/`, `state/`, `backups/`.
+**Adapter contract:** `export function classify(payload: unknown): Event | null` — never throws, returns `null` for unmapped events. **Single notify chokepoint:** all dispatch flows through `core/notify.ts`; idle-gating, sound selection, logging applied there. **Backup before edit:** every write to `~/.claude/settings.json`, `~/.codex/config.toml`, etc. copies to `<file>.agent-notifier.bak` first; `uninstall` restores. **Config dir:** `~/.agent-notifier/` (mac) / `%APPDATA%\.agent-notifier\` (win), subdirs `log/`, `state/`, `backups/`.
 
 For codebase questions, read `graphify-out/GRAPH_REPORT.md` before raw files.
 

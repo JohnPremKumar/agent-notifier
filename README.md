@@ -153,7 +153,7 @@ The default ("fire when elsewhere") only notifies if your active app isn't the A
 
 - **Zero telemetry.** Never phones home.
 - **Zero network calls.** Everything runs locally.
-- **State lives in `~/.agent-notifier/`** on macOS, `%APPDATA%\agent-notifier\` on Windows.
+- **State lives in `~/.agent-notifier/`** on macOS, `%APPDATA%\.agent-notifier\` on Windows.
 - **Logs contain metadata only** — event kind, project name, session id, suppression reason. Never your prompts, never agent output.
 
 ## Roadmap
