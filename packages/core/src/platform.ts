@@ -11,7 +11,11 @@ export function configDir(): string {
     if (!appData) throw new Error('APPDATA env var not set on Windows');
     return path.win32.join(appData, 'agent-notifier');
   }
-  return path.join(homedir(), '.agent-notifier');
+  // Use path.posix explicitly: `path.join` resolves to the host OS's
+  // separator at module-load time, so on a Windows host with a mocked
+  // process.platform=darwin (in tests) it would emit backslashes. POSIX
+  // paths are correct for macOS and Linux runtime.
+  return path.posix.join(homedir(), '.agent-notifier');
 }
 
 export function logDir(): string {

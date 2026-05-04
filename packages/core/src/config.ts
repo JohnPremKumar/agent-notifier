@@ -56,6 +56,13 @@ export function saveConfig(file: string, config: Config): void {
   const fd = openSync(tmp, 'r');
   try {
     fsyncSync(fd);
+  } catch (e: unknown) {
+    // Windows + AV scanners and Windows + tmp dirs sometimes return
+    // EPERM on fsync of files that are otherwise readable/writable.
+    // The data has already been written via writeFileSync; fsync is a
+    // durability hint, not a correctness requirement. Swallow EPERM
+    // (Windows-specific) but rethrow anything else.
+    if ((e as NodeJS.ErrnoException).code !== 'EPERM') throw e;
   } finally {
     closeSync(fd);
   }
