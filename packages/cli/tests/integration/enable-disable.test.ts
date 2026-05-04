@@ -12,11 +12,20 @@ describe('enable / disable', () => {
   let home: string;
   let projectDir: string;
   beforeEach(() => {
-    home = realpathSync(mkdtempSync(join(tmpdir(), 'agentena-')));
-    projectDir = join(home, 'project-x');
+    home = realpathSync(mkdtempSync(join(tmpdir(), 'agentena-home-')));
+    // Separate tmpdir, not nested under home — prevents Windows cwd-lock
+    // from blocking home cleanup. See nodejs/node#50101.
+    projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'agentena-proj-')));
     mkdirSync(join(projectDir, '.git'), { recursive: true });
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    try {
+      rmSync(projectDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // Best-effort: Windows may still hold cwd lock; OS tmp cleanup reaps it.
+    }
+  });
 
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
   const cfg = () =>

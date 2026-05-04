@@ -21,6 +21,13 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      # Build before lint: type-aware ESLint rules
+      # (@typescript-eslint/recommended-type-checked) need cross-package
+      # `.d.ts` declarations to resolve types like Config from
+      # @agent-notifier/core. Without dist/, every cross-package import
+      # falls back to `error` type and the lint reports hundreds of
+      # "Unsafe member access" errors. Locally this hides because dist/
+      # is usually stale from prior builds.
       - run: pnpm build
+      - run: pnpm lint
       - run: pnpm test

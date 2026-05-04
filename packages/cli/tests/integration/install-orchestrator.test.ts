@@ -15,7 +15,7 @@ describe('install / uninstall orchestrator', () => {
     mkdirSync(join(home, '.claude'));
     mkdirSync(join(home, '.gemini'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
   const env = () => ({ ...process.env, HOME: home, USERPROFILE: home, APPDATA: home });
 

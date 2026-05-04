@@ -24,11 +24,11 @@ describe('platform', () => {
     expect(configDir()).toBe('/Users/x/.agent-notifier');
   });
 
-  it('configDir returns %APPDATA%\\agent-notifier on Windows', async () => {
+  it('configDir returns %APPDATA%\\.agent-notifier on Windows', async () => {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     process.env['APPDATA'] = 'C:\\Users\\x\\AppData\\Roaming';
     const { configDir } = await import('../src/platform.js');
-    expect(configDir()).toBe('C:\\Users\\x\\AppData\\Roaming\\agent-notifier');
+    expect(configDir()).toBe('C:\\Users\\x\\AppData\\Roaming\\.agent-notifier');
   });
 
   it('isSupportedPlatform is true on darwin and win32, false elsewhere', async () => {

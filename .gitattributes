@@ -1,0 +1,16 @@
+# Force LF line endings everywhere (regardless of host OS) so Prettier's
+# format check matches between macOS, Linux, and Windows checkouts. Without
+# this, Git on Windows converts LF to CRLF on checkout and 100% of files
+# fail `prettier --check`.
+* text=auto eol=lf
+
+# Binary asset types — never normalize, never diff as text.
+*.png binary
+*.icns binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.aiff binary
+*.caf binary
+*.wav binary
