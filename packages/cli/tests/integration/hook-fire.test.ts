@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,16 @@ describe('hook → notify pipeline (stubbed notifier)', () => {
   let home: string;
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'agenthook-'));
+    // Pin idleGate to always-fire so the integration test exercises a deterministic
+    // fire path. Without this, fire-elsewhere mode would consult OS probes (osascript,
+    // ioreg, ps) in CI and pass only by coincidence (fail-open returns fire:true). We
+    // want to verify the stub captures TURN_DONE, not the fail-open escape hatch.
+    const cfgDir = join(home, '.agent-notifier');
+    mkdirSync(cfgDir, { recursive: true });
+    writeFileSync(
+      join(cfgDir, 'config.json'),
+      JSON.stringify({ version: 2, tz: 'UTC', idleGate: { mode: 'always-fire' } }),
+    );
   });
   afterEach(() => rmSync(home, { recursive: true, force: true }));
 
@@ -21,7 +31,6 @@ describe('hook → notify pipeline (stubbed notifier)', () => {
     USERPROFILE: home,
     APPDATA: home,
     AGENT_NOTIFIER_NOTIFY_IMPL: 'stub',
-    AGENT_NOTIFIER_IDLE_SECONDS: '60',
   });
 
   it('claude-code Stop event fires TURN_DONE notification (stub captures it)', () => {
